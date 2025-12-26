@@ -23,6 +23,11 @@ LOG_LEVELS = {
     "error": logging.ERROR,
 }
 
+try:
+    from rich.logging import RichHandler
+except Exception:
+    RichHandler = None
+
 
 def _split_langs(s: str) -> Optional[List[str]]:
     parts = [x.strip() for x in (s or "").split(",") if x.strip()]
@@ -90,10 +95,18 @@ def main(argv: Optional[List[str]] = None) -> None:
     args = ap.parse_args(argv)
 
     level = LOG_LEVELS.get(args.log_level.lower(), logging.INFO)
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    if RichHandler:
+        logging.basicConfig(
+            level=level,
+            format="%(message)s",
+            datefmt="[%X]",
+            handlers=[RichHandler(rich_tracebacks=True, show_path=False)],
+        )
+    else:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        )
 
     used = load_dotenv(".env")
     if used:

@@ -47,6 +47,12 @@ def build_tasks(
     data = {}
     if tasks_file:
         data = _read_tasks_file(Path(tasks_file))
+    else:
+        default_path = Path(__file__).resolve().parent / "tasks.yaml"
+        if default_path.exists():
+            data = _read_tasks_file(default_path)
+        else:
+            logger.warning("No tasks file found at %s", default_path)
 
     publishers = _to_pairs(data.get("publishers", []), "publisher_seed")
     subjects = _to_pairs(data.get("subjects", []), "subject_seed")
