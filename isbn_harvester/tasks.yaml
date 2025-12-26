@@ -1,0 +1,83 @@
+publishers:
+  - JPS
+  - Schocken
+  - Jewish Publication Society
+  - Yad Vashem
+  - Ktav
+  - Gefen
+  - Ben Yehuda Press
+  - Toby Press
+  - Academic Studies Press
+
+subjects:
+  - Judaism
+  - Jewish history
+  - Holocaust
+  - Israel
+  - Antisemitism
+  - Jewish fiction
+  - Yiddish language
+  - Hebrew language
+  - Kabbalah
+
+base_queries:
+  - Jewish
+  - Judaism
+  - Jews
+  - Hebrew
+  - Yiddish
+  - Talmud
+  - Torah
+  - Rabbi
+  - Synagogue
+  - Hasidic
+  - Kabbalah
+  - Israel
+  - Jerusalem
+  - Zionism
+  - Holocaust
+  - Shoah
+  - Antisemitism
+  - Pogrom
+  - Passover
+  - Hanukkah
+  - Yom Kippur
+  - Rosh Hashanah
+  - Shabbat
+  - Bar Mitzvah
+  - Bat Mitzvah
+  - Sephardic
+  - Ashkenazi
+
+intent_queries:
+  - Jewish memoir
+  - Jewish biography
+  - Jewish cookbook kosher
+  - Jewish education
+  - Jewish philosophy
+  - Jewish prayer siddur
+  - Talmud commentary
+  - Torah commentary
+  - History of Israel
+  - Israel politics
+  - Holocaust memoir
+  - Holocaust survivor testimony
+  - Antisemitism history
+  - Jewish diaspora
+  - Jewish immigration
+
+fiction_queries:
+  - Jewish novel
+  - Israeli novel
+  - Holocaust novel
+  - Jewish fiction
+  - Israeli fiction
+  - Jewish mystery
+  - Jewish romance
+  - Israeli thriller
+  - Holocaust fiction
+  - Jewish short stories
+
+exclude_queries:
+  - Christmas
+  - Easter
