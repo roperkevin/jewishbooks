@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import os
 import tempfile
 import time
@@ -10,6 +11,7 @@ from typing import Iterable, List
 
 from .models import BookRow
 
+logger = logging.getLogger(__name__)
 
 def atomic_write_csv(write_fn, out_path: str) -> None:
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
@@ -77,6 +79,7 @@ def _write_schema(out_path: str) -> None:
             json.dump(payload, f, indent=2, sort_keys=True)
 
     atomic_write_csv(_write, meta_path)
+    logger.debug("Wrote schema: %s", meta_path)
 
 
 def write_full_csv(rows: Iterable[BookRow], out_path: str) -> None:
@@ -92,6 +95,7 @@ def write_full_csv(rows: Iterable[BookRow], out_path: str) -> None:
 
     atomic_write_csv(_write, out_path)
     _write_schema(out_path)
+    logger.info("Wrote full CSV: %s rows=%s", out_path, len(rows))
 
 
 def _to_int(val: str) -> int:

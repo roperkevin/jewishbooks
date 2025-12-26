@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import os
 import re
 import tempfile
@@ -10,6 +11,7 @@ from typing import Iterable, List, Set
 from .models import BookRow
 from .normalize import html_escape_text
 
+logger = logging.getLogger(__name__)
 
 def subjects_to_list_json(subjects: str, max_items: int = 100, max_item_len: int = 255) -> str:
     parts = [p.strip() for p in (subjects or "").split(",") if p.strip()]
@@ -210,3 +212,4 @@ def write_shopify_products_csv(rows: Iterable[BookRow], out_path: str, *, publis
                 })
 
     atomic_write_csv(_write, out_path)
+    logger.info("Wrote Shopify CSV: %s rows=%s", out_path, len(rows))

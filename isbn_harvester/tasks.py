@@ -3,13 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
+import logging
+
 import yaml
+
+logger = logging.getLogger(__name__)
 
 from .models import TaskSpec
 
 
 def _read_tasks_file(path: Path) -> Dict[str, List[str]]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    logger.info("Loaded tasks file: %s", path)
     out: Dict[str, List[str]] = {}
     for key, value in data.items():
         if isinstance(value, list):
@@ -72,4 +77,5 @@ def build_tasks(
         ded = [t for t in ded if t.group.lower() in groups_norm]
     if limit is not None and limit > 0:
         ded = ded[:limit]
+    logger.info("Built tasks: %s", len(ded))
     return ded

@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import sys
 import random
 import threading
 import time
@@ -25,6 +27,8 @@ from .parse import parse_book
 from .scoring import rank_score, jewish_relevance_score, fiction_flag, popularity_proxy
 from .stats_tracker import StatsTracker
 from .store import RowStore
+
+logger = logging.getLogger(__name__)
 
 
 # -----------------------------
@@ -276,6 +280,7 @@ class Harvester:
         if self.shuffle_tasks:
             random.shuffle(work)
 
+        logger.info("Harvest start: tasks=%s concurrency=%s", len(work), self.concurrency)
         q: Queue[TaskSpec] = Queue()
         for t in work:
             q.put(t)
@@ -352,12 +357,14 @@ class Harvester:
                                         "ts": time.time(),
                                     }
                                 )
-                                # Make it very obvious in console output
-                                print(f"\n[quota] {qe}")
+                                sys.stdout.write("\n")
+                                sys.stdout.flush()
+                                logger.error("Quota exhausted during %s:%s page=%s", t.endpoint, t.query, page)
                                 raise
                             except ISBNdbError as e:
                                 msg = str(e)
                                 if t.endpoint in ("publisher", "subject") and "401" not in msg:
+                                    logger.warning("Fallback to search for %s:%s due to %s", t.endpoint, t.query, msg)
                                     url, params = build_task_request(
                                         endpoint="search",
                                         query=t.query,
@@ -527,7 +534,7 @@ class Harvester:
                     self.stats.inc_errors()
 
                     if self.verbose_task_errors:
-                        print(f"\n[task_error] {t.endpoint}:{t.query} page={page} -> {e!r}")
+                        logger.error("Task error %s:%s page=%s -> %r", t.endpoint, t.query, page, e)
 
                     self.ck_write(
                         {
@@ -592,6 +599,7 @@ class Harvester:
             for th in threads:
                 th.join(timeout=1.0)
             print()
+            logger.info("Harvest complete: unique13=%s", self.store.size())
         finally:
             stop_snap.set()
             if snap_thread:

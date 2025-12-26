@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 from typing import List, Optional
 
@@ -15,18 +16,21 @@ from .store import RowStore
 from .tasks import build_tasks
 
 
+LOG_LEVELS = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+}
+
+
 def _split_langs(s: str) -> Optional[List[str]]:
     parts = [x.strip() for x in (s or "").split(",") if x.strip()]
     return parts or None
 
 
 def main(argv: Optional[List[str]] = None) -> None:
-    used = load_dotenv(".env")
-    if used:
-        print(f"[info] loaded .env: {used}")
-    else:
-        print("[warn] .env not found via search paths; relying on existing environment variables")
-
+    logger = logging.getLogger(__name__)
     ap = argparse.ArgumentParser(
         prog="isbn_harvester",
         description="ISBNdb Jewish/Israel/Holocaust Book Harvester + Cover Uploader + Shopify CSV (metafields)",
@@ -81,8 +85,21 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--covers-skip-existing-s3", action="store_true", help="Reuse any existing S3 object under covers/{isbn13}/")
     ap.add_argument("--covers-prefer-original", action="store_true", help="Prefer original/high-res cover URL when available")
     ap.add_argument("--covers-max-seconds", type=int, default=0, help="Max runtime seconds for covers (0 = no limit)")
+    ap.add_argument("--log-level", default="info", help="Log level: debug, info, warning, error")
 
     args = ap.parse_args(argv)
+
+    level = LOG_LEVELS.get(args.log_level.lower(), logging.INFO)
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    used = load_dotenv(".env")
+    if used:
+        logger.info("loaded .env: %s", used)
+    else:
+        logger.warning(".env not found via search paths; relying on existing environment variables")
 
     api_key = (os.getenv("ISBNDB_API_KEY") or "").strip()
     if not api_key:
@@ -100,16 +117,16 @@ def main(argv: Optional[List[str]] = None) -> None:
         tasks_file=args.tasks_file,
     )
 
-    print(f"Tasks: {len(tasks)} | fiction_only={args.fiction_only} | langs={langs or ['(none)']}")
-    print(f"Output(full): {args.out}")
+    logger.info("Tasks: %s | fiction_only=%s | langs=%s", len(tasks), args.fiction_only, langs or ["(none)"])
+    logger.info("Output(full): %s", args.out)
     if args.shopify_out:
-        print(f"Output(shopify): {args.shopify_out} (publish={args.shopify_publish})")
+        logger.info("Output(shopify): %s (publish=%s)", args.shopify_out, args.shopify_publish)
     if args.checkpoint:
-        print(f"Checkpoint: {args.checkpoint} (resume={args.resume})")
+        logger.info("Checkpoint: %s (resume=%s)", args.checkpoint, args.resume)
     if args.stop_file:
-        print(f"Stop file: {args.stop_file} (create it to stop gracefully)")
+        logger.info("Stop file: %s (create it to stop gracefully)", args.stop_file)
     if args.max_seconds:
-        print(f"Harvest max seconds: {args.max_seconds}")
+        logger.info("Harvest max seconds: %s", args.max_seconds)
 
     if args.covers_only:
         read_path = args.full_in or args.out
@@ -117,7 +134,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             raise SystemExit(f"Covers-only requires an existing full CSV at: {read_path}")
 
     if args.dry_run:
-        print("[info] dry-run enabled: only 1 page per task")
+        logger.info("dry-run enabled: only 1 page per task")
 
     # -----------------------
     # Harvest (dict pipeline)
@@ -167,11 +184,15 @@ def main(argv: Optional[List[str]] = None) -> None:
         rows.sort(key=lambda r: r.rank_score, reverse=True)
 
         write_full_csv(rows, args.out)
-        print(f"Done: wrote {len(rows)} full rows -> {args.out}")
+        logger.info("Done: wrote %s full rows -> %s", len(rows), args.out)
 
         if args.shopify_out:
             write_shopify_products_csv(rows, args.shopify_out, publish=args.shopify_publish)
-            print(f"Done: wrote {len(rows)} Shopify rows (with metafields) -> {args.shopify_out}")
+            logger.info(
+                "Done: wrote %s Shopify rows (with metafields) -> %s",
+                len(rows),
+                args.shopify_out,
+            )
 
     # -----------------------
     # Covers (CoverUploader)
@@ -185,9 +206,14 @@ def main(argv: Optional[List[str]] = None) -> None:
         if not s3_bucket:
             raise SystemExit("Covers enabled but S3_BUCKET is not set.")
 
-        print(f"S3_BUCKET={s3_bucket} | AWS_REGION={aws_region} | CLOUDFRONT_DOMAIN={cloudfront_domain or '(none)'}")
+        logger.info(
+            "S3_BUCKET=%s | AWS_REGION=%s | CLOUDFRONT_DOMAIN=%s",
+            s3_bucket,
+            aws_region,
+            cloudfront_domain or "(none)",
+        )
         if args.covers_max_seconds:
-            print(f"Covers max seconds: {args.covers_max_seconds}")
+            logger.info("Covers max seconds: %s", args.covers_max_seconds)
 
         cover_limiter = TokenBucket(args.covers_rate_per_sec, args.covers_burst)
 
@@ -217,21 +243,25 @@ def main(argv: Optional[List[str]] = None) -> None:
         rows.sort(key=lambda r: r.rank_score, reverse=True)
 
         write_full_csv(rows, args.out)
-        print(f"Done: rewrote {len(rows)} full rows with cover fields -> {args.out}")
+        logger.info("Done: rewrote %s full rows with cover fields -> %s", len(rows), args.out)
 
         if args.shopify_out:
             write_shopify_products_csv(rows, args.shopify_out, publish=args.shopify_publish)
-            print(f"Done: rewrote {len(rows)} Shopify rows with cover fields -> {args.shopify_out}")
+            logger.info(
+                "Done: rewrote %s Shopify rows with cover fields -> %s",
+                len(rows),
+                args.shopify_out,
+            )
 
-        print(f"Covers: uploaded/reused {uploaded}.")
+        logger.info("Covers: uploaded/reused %s.", uploaded)
 
     # Helpful warning: missing images
     rows_final = store.snapshot_values()
     missing_covers = [r for r in rows_final if not (r.cloudfront_cover_url or r.cover_url_original or r.cover_url)]
     if missing_covers:
-        print(f"\n[Warning] {len(missing_covers)} rows missing an image URL.")
+        logger.warning("%s rows missing an image URL.", len(missing_covers))
         for r in missing_covers[:10]:
-            print(f"  - {r.isbn13} | {r.title}")
+            logger.warning("missing cover: %s | %s", r.isbn13, r.title)
 
 
 if __name__ == "__main__":

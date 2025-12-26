@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import sys
 import threading
 import time
@@ -17,6 +18,7 @@ from .http_client import ISBNDB_BASE_URL, TokenBucket, isbndb_get
 from .models import BookRow
 from .store import RowStore
 
+logger = logging.getLogger(__name__)
 try:
     import boto3
 except Exception:
@@ -52,6 +54,7 @@ def fetch_image_bytes(session: requests.Session, url: str, *, timeout_s: int, re
     backoff = 1.0
     for attempt in range(1, retries + 2):
         try:
+            logger.debug("GET image %s attempt=%s/%s", url, attempt, retries + 1)
             r = session.get(url, timeout=timeout_s, stream=True)
             if r.status_code in (429, 500, 502, 503, 504):
                 if attempt <= retries:
@@ -69,7 +72,8 @@ def fetch_image_bytes(session: requests.Session, url: str, *, timeout_s: int, re
                 raise RuntimeError(f"Image too small ({len(body)} bytes)")
 
             return body, content_type
-        except Exception:
+        except Exception as e:
+            logger.warning("Image fetch error for %s: %r", url, e)
             if attempt <= retries:
                 time.sleep(min(30.0, backoff))
                 backoff = min(30.0, backoff * 2)
@@ -193,6 +197,7 @@ class CoverUploader:
         refreshed_at = int(datetime.now(timezone.utc).timestamp())
 
         self._start_ts = time.time()
+        logger.info("Cover run start: targets=%s max_covers=%s", len(targets), self.max_covers)
 
         def bump_uploaded(n: int = 1) -> None:
             with self._progress_lock:
@@ -242,6 +247,7 @@ class CoverUploader:
 
                             ck.write({"type": "cover_reused_existing_s3", "isbn13": isbn13, "s3_key": existing_key, "ts": time.time()})
                             ck.write({"type": "cover_done", "isbn13": isbn13, "ts": time.time(), "mode": "reuse_existing_s3"})
+                            logger.debug("Cover reused from S3: %s -> %s", isbn13, existing_key)
                             q.task_done()
                             continue
 
@@ -251,12 +257,14 @@ class CoverUploader:
 
                     if not cover and not cover_orig:
                         ck.write({"type": "cover_done", "isbn13": isbn13, "ts": time.time(), "mode": "no_cover"})
+                        logger.debug("No cover for %s", isbn13)
                         q.task_done()
                         continue
 
                     chosen = (cover_orig if self.prefer_original and cover_orig else cover) or cover_orig
                     if not chosen:
                         ck.write({"type": "cover_done", "isbn13": isbn13, "ts": time.time(), "mode": "no_chosen_url"})
+                        logger.debug("No chosen cover URL for %s", isbn13)
                         q.task_done()
                         continue
 
@@ -284,10 +292,12 @@ class CoverUploader:
 
                     ck.write({"type": "cover_uploaded", "isbn13": isbn13, "s3_key": key, "ts": time.time()})
                     ck.write({"type": "cover_done", "isbn13": isbn13, "ts": time.time(), "mode": "uploaded"})
+                    logger.debug("Cover uploaded: %s -> %s", isbn13, key)
 
                 except Exception as e:
                     bump_error(1)
                     ck.write({"type": "cover_error", "isbn13": isbn13, "error": repr(e), "ts": time.time()})
+                    logger.error("Cover error for %s: %r", isbn13, e)
                 finally:
                     q.task_done()
 
@@ -315,4 +325,5 @@ class CoverUploader:
         ck.close()
         print()
         done_n, _ = progress_snapshot()
+        logger.info("Cover run complete: uploaded=%s", done_n)
         return done_n
