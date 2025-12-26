@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import random
 import threading
 import time
@@ -47,6 +48,12 @@ def make_isbndb_session(api_key: str) -> requests.Session:
         "User-Agent": "isbn-harvester/3.1",
     })
     return s
+
+
+def clone_isbndb_session(session: requests.Session) -> requests.Session:
+    cloned = requests.Session()
+    cloned.headers.update(session.headers)
+    return cloned
 
 
 def _sleep_jitter(base: float, jitter: float = 0.25) -> None:
@@ -130,15 +137,17 @@ def build_task_request(endpoint: str, query: str, page: int, page_size: int, lan
     Build request for harvesting.
 
     Strategy:
-    - Prefer /books/{query} (works on many plans)
-    - Some plans only allow /books list searching via q=
+    - Use endpoint-specific routes when available (publisher/subject/search)
+    - Fall back to /books list search for the generic case
     """
     q = quote(query, safe="")
     params: Dict[str, str] = {"page": str(page), "pageSize": str(page_size)}
     if lang:
         params["language"] = lang
 
-    # primary
-    url = f"{ISBNDB_BASE_URL}/books/{q}"
-    return url, params
-
+    if endpoint == "search":
+        params["q"] = query
+        return f"{ISBNDB_BASE_URL}/books", params
+    if endpoint in ("publisher", "subject"):
+        return f"{ISBNDB_BASE_URL}/{endpoint}/{q}", params
+    return f"{ISBNDB_BASE_URL}/books/{q}", params

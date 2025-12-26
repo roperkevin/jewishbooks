@@ -42,6 +42,19 @@ def is_valid_isbn13(isbn13: str) -> bool:
     return check == digits[12]
 
 
+def isbn10_to_isbn13(isbn10: str) -> str:
+    isbn10 = normalize_isbn(isbn10)
+    if not is_valid_isbn10(isbn10):
+        return ""
+    core = "978" + isbn10[:9]
+    digits = [int(c) for c in core]
+    s = 0
+    for i in range(12):
+        s += digits[i] * (1 if i % 2 == 0 else 3)
+    check = (10 - (s % 10)) % 10
+    return f"{core}{check}"
+
+
 def snip_html(text: str, max_len: int = 260) -> str:
     if not text:
         return ""
@@ -66,8 +79,8 @@ def build_shopify_tags(
     subjects: str,
     matched_terms: str,
     publisher: str,
-    max_tags: int = 40,
-    max_total_len: int = 2000,
+    max_tags: int = 250,
+    max_total_len: int = 5000,
 ) -> str:
     raw: List[str] = []
     if subjects:
@@ -87,8 +100,8 @@ def build_shopify_tags(
             continue
         seen.add(t)
 
-        if len(t) > 60:
-            t = t[:60].strip()
+        if len(t) > 255:
+            t = t[:255].strip()
 
         candidate = (", ".join(out + [t])) if out else t
         if len(candidate) > max_total_len:

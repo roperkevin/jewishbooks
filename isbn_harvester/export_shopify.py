@@ -11,7 +11,7 @@ from .models import BookRow
 from .normalize import html_escape_text
 
 
-def subjects_to_list_json(subjects: str, max_items: int = 50, max_item_len: int = 200) -> str:
+def subjects_to_list_json(subjects: str, max_items: int = 100, max_item_len: int = 255) -> str:
     parts = [p.strip() for p in (subjects or "").split(",") if p.strip()]
     seen: Set[str] = set()
     out: List[str] = []
@@ -44,6 +44,8 @@ def slugify_handle(title: str, isbn13: str) -> str:
 
 def build_body_html(r: BookRow) -> str:
     parts: List[str] = []
+    if r.subtitle:
+        parts.append(f"<p><em>{html_escape_text(r.subtitle)}</em></p>")
     if r.synopsis:
         parts.append(f"<p>{html_escape_text(r.synopsis)}</p>")
     if r.overview and r.overview != r.synopsis:
@@ -105,6 +107,9 @@ def write_shopify_products_csv(rows: Iterable[BookRow], out_path: str, *, publis
         mf("isbn_13", "single_line_text_field"),
         mf("isbn_10", "single_line_text_field"),
         mf("authors", "single_line_text_field"),
+        mf("subtitle", "single_line_text_field"),
+        mf("edition", "single_line_text_field"),
+        mf("dimensions", "single_line_text_field"),
         mf("publisher", "single_line_text_field"),
         mf("publish_date", "single_line_text_field"),
         mf("language", "single_line_text_field"),
@@ -174,6 +179,9 @@ def write_shopify_products_csv(rows: Iterable[BookRow], out_path: str, *, publis
                     mf("isbn_13", "single_line_text_field"): r.isbn13 or "",
                     mf("isbn_10", "single_line_text_field"): r.isbn10 or "",
                     mf("authors", "single_line_text_field"): r.authors or "",
+                    mf("subtitle", "single_line_text_field"): r.subtitle or "",
+                    mf("edition", "single_line_text_field"): r.edition or "",
+                    mf("dimensions", "single_line_text_field"): r.dimensions or "",
                     mf("publisher", "single_line_text_field"): r.publisher or "",
                     mf("publish_date", "single_line_text_field"): r.date_published or "",
                     mf("language", "single_line_text_field"): r.language or "",

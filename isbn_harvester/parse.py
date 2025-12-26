@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Dict, Tuple
 
-from isbn_harvester.normalize import normalize_isbn, is_valid_isbn13, is_valid_isbn10
+from isbn_harvester.normalize import normalize_isbn, is_valid_isbn13, is_valid_isbn10, isbn10_to_isbn13
 
 _HTML_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
@@ -36,7 +36,7 @@ def parse_book(book: Dict) -> Tuple[str, str, Dict[str, str]]:
         (isbn13, isbn10, fields_dict)
 
     fields_dict keys:
-        title, title_long, authors, date_published, publisher, language,
+        title, title_long, subtitle, edition, dimensions, authors, date_published, publisher, language,
         subjects, pages, format, synopsis, overview,
         cover_url, cover_url_original
     """
@@ -59,6 +59,8 @@ def parse_book(book: Dict) -> Tuple[str, str, Dict[str, str]]:
         isbn13 = ""
     if isbn10 and not is_valid_isbn10(isbn10):
         isbn10 = ""
+    if not isbn13 and isbn10:
+        isbn13 = isbn10_to_isbn13(isbn10)
 
     # --- Core text fields ---
     title = _clean_text(book.get("title") or "")
@@ -66,6 +68,21 @@ def parse_book(book: Dict) -> Tuple[str, str, Dict[str, str]]:
         book.get("title_long")
         or book.get("titleLong")
         or title
+    )
+    subtitle = _clean_text(
+        book.get("subtitle")
+        or book.get("sub_title")
+        or ""
+    )
+    edition = _clean_text(
+        book.get("edition")
+        or book.get("edition_info")
+        or ""
+    )
+    dimensions = _clean_text(
+        book.get("dimensions")
+        or book.get("dimension")
+        or ""
     )
 
     authors = _clean_text(_join_list(book.get("authors")))
@@ -119,6 +136,9 @@ def parse_book(book: Dict) -> Tuple[str, str, Dict[str, str]]:
     fields = {
         "title": title,
         "title_long": title_long,
+        "subtitle": subtitle,
+        "edition": edition,
+        "dimensions": dimensions,
         "authors": authors,
         "date_published": date_published,
         "publisher": publisher,

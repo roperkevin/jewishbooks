@@ -25,14 +25,37 @@ SCORE_TERMS = {
     "yad vashem": 4, "balfour": 2, "knesset": 2, "idf": 2,
 }
 
-NEGATIVE_TERMS = {"christmas": -2, "easter": -2, "church": -2, "bible study": -1}
+NEGATIVE_TERMS = {
+    "christmas": -2,
+    "easter": -2,
+    "church": -2,
+    "bible study": -1,
+    "new testament": -2,
+    "jesus": -3,
+}
 
 FICTION_HINTS = (
     "fiction", "novel", "short stories", "mystery", "thriller",
     "fantasy", "romance", "literary fiction",
 )
+NON_FICTION_HINTS = ("nonfiction", "non-fiction")
 
 _WORDISH = re.compile(r"^[a-z0-9]+$")
+
+
+_SYNONYM_REPLACEMENTS = {
+    "anti-semitism": "antisemitism",
+    "anti semitism": "antisemitism",
+    "chassidic": "hasidic",
+    "chasidic": "hasidic",
+    "shabbos": "shabbat",
+}
+
+
+def _apply_synonyms(hay: str) -> str:
+    for src, dst in _SYNONYM_REPLACEMENTS.items():
+        hay = hay.replace(src, dst)
+    return hay
 
 
 def _normalize_haystack(*texts: str) -> str:
@@ -40,6 +63,7 @@ def _normalize_haystack(*texts: str) -> str:
     hay = hay.lower()
     hay = re.sub(r"[-–—]", " ", hay)
     hay = re.sub(r"\s+", " ", hay).strip()
+    hay = _apply_synonyms(hay)
     return hay
 
 
@@ -54,31 +78,38 @@ def _term_in_hay(term: str, hay: str) -> bool:
     return t in hay
 
 
-def jewish_relevance_score(*texts: str) -> Tuple[int, List[str]]:
-    hay = _normalize_haystack(*texts)
-    score = 0
+def jewish_relevance_score(*texts: str, field_weights: Optional[List[float]] = None) -> Tuple[int, List[str]]:
+    weights = field_weights or []
+    if weights and len(weights) < len(texts):
+        weights = weights + [1.0] * (len(texts) - len(weights))
+    elif not weights:
+        weights = [1.0] * len(texts)
+
+    score = 0.0
     matched: List[str] = []
 
-    for term, w in SCORE_TERMS.items():
-        if _term_in_hay(term, hay):
-            score += w
-            matched.append(term)
+    for text, wgt in zip(texts, weights):
+        hay = _normalize_haystack(text)
+        for term, w in SCORE_TERMS.items():
+            if _term_in_hay(term, hay):
+                score += w * float(wgt)
+                matched.append(term)
+        for term, w in NEGATIVE_TERMS.items():
+            if _term_in_hay(term, hay):
+                score += w * float(wgt)
+                matched.append(term)
+        if re.search(r"\bjew\w*\b", hay):
+            score += 2 * float(wgt)
+            matched.append("contains:jew*")
 
-    for term, w in NEGATIVE_TERMS.items():
-        if _term_in_hay(term, hay):
-            score += w
-            matched.append(term)
-
-    if re.search(r"\bjew\w*\b", hay):
-        score += 2
-        matched.append("contains:jew*")
-
-    return score, sorted(set(matched))
+    return int(round(score)), sorted(set(matched))
 
 
 def fiction_flag(subjects: str, synopsis: str, title: str = "") -> int:
     hay = _normalize_haystack(subjects, synopsis, title)
-    return 1 if any(h in hay for h in FICTION_HINTS) else 0
+    if any(_term_in_hay(h, hay) for h in NON_FICTION_HINTS):
+        return 0
+    return 1 if any(_term_in_hay(h, hay) for h in FICTION_HINTS) else 0
 
 
 def popularity_proxy(pages: str, date_published: str, language: str, has_synopsis: bool) -> float:

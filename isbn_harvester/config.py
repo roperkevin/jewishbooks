@@ -6,15 +6,34 @@ from pathlib import Path
 from typing import List, Optional
 
 
+def _strip_inline_comment(val: str) -> str:
+    in_single = False
+    in_double = False
+    for i, ch in enumerate(val):
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            continue
+        if ch == "#" and not in_single and not in_double:
+            return val[:i].rstrip()
+    return val.rstrip()
+
+
 def _parse_env_file(path: Path) -> None:
     try:
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
+            if line.startswith("export "):
+                line = line[len("export ") :].lstrip()
             k, v = line.split("=", 1)
             k = k.strip()
-            v = v.strip().strip('"').strip("'")
+            v = _strip_inline_comment(v.strip())
+            if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+                v = v[1:-1]
             if k and k not in os.environ:
                 os.environ[k] = v
     except Exception:

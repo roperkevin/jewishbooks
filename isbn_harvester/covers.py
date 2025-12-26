@@ -7,7 +7,7 @@ import time
 from dataclasses import replace
 from datetime import datetime, timezone
 from queue import Queue, Empty
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse, quote
 
 import requests
@@ -148,6 +148,8 @@ class CoverUploader:
         self._progress_lock = threading.Lock()
         self._uploaded = 0
         self._errors = 0
+        self._s3_cache: Dict[str, Optional[str]] = {}
+        self._s3_cache_lock = threading.Lock()
 
     def should_stop(self) -> bool:
         if self.max_seconds > 0 and (time.time() - self._start_ts) >= self.max_seconds:
@@ -155,6 +157,15 @@ class CoverUploader:
         if self.stop_file and __import__("os").path.exists(self.stop_file):
             return True
         return False
+
+    def _get_existing_cover_key(self, isbn13: str) -> Optional[str]:
+        with self._s3_cache_lock:
+            if isbn13 in self._s3_cache:
+                return self._s3_cache[isbn13]
+        key = s3_find_existing_cover_key(self.s3, self.s3_bucket, isbn13)
+        with self._s3_cache_lock:
+            self._s3_cache[isbn13] = key
+        return key
 
     def run(self) -> int:
         done_covers = read_completed_covers(self.checkpoint_path)
@@ -213,7 +224,7 @@ class CoverUploader:
                         continue
 
                     if self.skip_existing_s3:
-                        existing_key = s3_find_existing_cover_key(self.s3, self.s3_bucket, isbn13)
+                        existing_key = self._get_existing_cover_key(isbn13)
                         if existing_key:
                             cf_url = f"https://{self.cloudfront_domain}/{existing_key}" if self.cloudfront_domain else ""
 

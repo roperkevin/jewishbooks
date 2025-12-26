@@ -9,6 +9,9 @@ class BookRow:
     isbn13: str
     title: str
     title_long: str
+    subtitle: str
+    edition: str
+    dimensions: str
     authors: str
     date_published: str
     publisher: str

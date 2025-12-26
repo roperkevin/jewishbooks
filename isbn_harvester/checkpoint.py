@@ -60,6 +60,8 @@ class CheckpointWriter:
     def __init__(self, path: Optional[str]) -> None:
         self.path = path
         self._lock = threading.Lock()
+        if path:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         self._fh = open(path, "a", encoding="utf-8") if path else None
 
     def write(self, obj: dict) -> None:

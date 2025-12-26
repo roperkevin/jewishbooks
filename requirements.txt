@@ -2,3 +2,5 @@ requests
 python-dotenv
 tqdm
 boto3
+pytest
+pyyaml

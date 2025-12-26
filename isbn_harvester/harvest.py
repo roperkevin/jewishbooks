@@ -2,68 +2,34 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import threading
 import time
-from dataclasses import dataclass
 from queue import Empty, Queue
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
-from .checkpoint import task_id
+from .checkpoint import CheckpointWriter, read_completed_tasks, task_id
 from .export_full import write_full_csv
 from .http_client import (
     TokenBucket,
     ISBNdbError,
     ISBNdbQuotaError,
     build_task_request,
+    clone_isbndb_session,
     isbndb_get,
 )
 from .models import BookRow, TaskSpec
 from .normalize import build_shopify_tags
 from .parse import parse_book
 from .scoring import rank_score, jewish_relevance_score, fiction_flag, popularity_proxy
-
-
-# -----------------------------
-# Stats
-# -----------------------------
-@dataclass
-class Stats:
-    tasks_total: int = 0
-    tasks_done: int = 0
-    requests_ok: int = 0
-    errors: int = 0
-    books_seen: int = 0
-    kept: int = 0
-    unique13: int = 0
+from .stats_tracker import StatsTracker
+from .store import RowStore
 
 
 # -----------------------------
 # Checkpoint helpers
 # -----------------------------
-def read_completed_tasks(checkpoint_path: Optional[str]) -> Set[str]:
-    done: Set[str] = set()
-    if not checkpoint_path:
-        return done
-    try:
-        with open(checkpoint_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
-                if rec.get("type") == "task_done" and rec.get("task_id"):
-                    done.add(str(rec["task_id"]))
-    except FileNotFoundError:
-        return done
-    except Exception:
-        return done
-    return done
-
-
 def _merge_sources(existing_sources: str, new_source: str, max_sources: int = 12) -> str:
     new_source = (new_source or "").strip()
     if not new_source:
@@ -85,6 +51,9 @@ def _completeness(r: BookRow) -> int:
             1 if r.publisher else 0,
             1 if r.date_published else 0,
             1 if r.pages else 0,
+            1 if r.subtitle else 0,
+            1 if r.edition else 0,
+            1 if r.dimensions else 0,
             1 if (r.cloudfront_cover_url or r.cover_url or r.cover_url_original) else 0,
         ]
     )
@@ -137,6 +106,9 @@ def merge_row(existing: BookRow, new: BookRow, fiction_only: bool) -> BookRow:
         isbn13=pick.isbn13,
         title=pick.title,
         title_long=pick.title_long,
+        subtitle=pick.subtitle,
+        edition=pick.edition,
+        dimensions=pick.dimensions,
         authors=pick.authors,
         date_published=pick.date_published,
         publisher=pick.publisher,
@@ -177,6 +149,7 @@ class Harvester:
         *,
         tasks: List[TaskSpec],
         session,
+        session_factory: Optional[Callable[[], object]] = None,
         out_path: str,
         raw_jsonl: Optional[str],
         checkpoint_path: Optional[str],
@@ -195,12 +168,15 @@ class Harvester:
         snapshot_every_s: int,
         fiction_only: bool,
         bookshop_affiliate_id: Optional[str],
+        bookshop_enabled: bool = True,
         stop_file: Optional[str],
         max_seconds: int,
+        dry_run: bool = False,
         verbose_task_errors: bool = True,
     ) -> None:
         self.tasks = tasks
         self.session = session
+        self.session_factory = session_factory or (lambda: clone_isbndb_session(session))
         self.out_path = out_path
         self.raw_jsonl = raw_jsonl
         self.checkpoint_path = checkpoint_path
@@ -218,23 +194,27 @@ class Harvester:
         self.snapshot_every_s = snapshot_every_s
         self.fiction_only = fiction_only
         self.bookshop_affiliate_id = bookshop_affiliate_id
+        self.bookshop_enabled = bookshop_enabled
 
         self.stop_file = stop_file
         self.max_seconds = max_seconds
+        self.dry_run = dry_run
         self.verbose_task_errors = verbose_task_errors
 
         self.limiter = TokenBucket(rate_per_sec, burst)
 
-        self.seen: Dict[str, BookRow] = {}
-        self.seen_lock = threading.Lock()
+        self.store = RowStore()
 
-        self.stats = Stats(tasks_total=0)
-        self.stats_lock = threading.Lock()
+        self.stats = StatsTracker(tasks_total=0)
 
         self.quota_stop = threading.Event()
 
-        self.ck_lock = threading.Lock()
-        self.ck_fh = open(checkpoint_path, "a", encoding="utf-8") if checkpoint_path else None
+        if checkpoint_path:
+            os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
+        if raw_jsonl:
+            os.makedirs(os.path.dirname(raw_jsonl) or ".", exist_ok=True)
+
+        self.ck = CheckpointWriter(checkpoint_path)
 
         self.raw_lock = threading.Lock()
         self.raw_fh = open(raw_jsonl, "a", encoding="utf-8") if raw_jsonl else None
@@ -247,11 +227,7 @@ class Harvester:
                 self.raw_fh.close()
         finally:
             self.raw_fh = None
-        try:
-            if self.ck_fh:
-                self.ck_fh.close()
-        finally:
-            self.ck_fh = None
+        self.ck.close()
 
     def should_stop(self) -> bool:
         if self.quota_stop.is_set():
@@ -269,11 +245,7 @@ class Harvester:
         return False
 
     def ck_write(self, obj: dict) -> None:
-        if not self.ck_fh:
-            return
-        with self.ck_lock:
-            self.ck_fh.write(json.dumps(obj, ensure_ascii=False) + "\n")
-            self.ck_fh.flush()
+        self.ck.write(obj)
 
     def snapshot_writer(self, stop_evt: threading.Event) -> None:
         last_n = 0
@@ -282,8 +254,7 @@ class Harvester:
             if stop_evt.is_set() or self.should_stop():
                 return
             try:
-                with self.seen_lock:
-                    rows = list(self.seen.values())
+                rows = self.store.snapshot_values()
                 if len(rows) == last_n:
                     continue
                 last_n = len(rows)
@@ -309,8 +280,7 @@ class Harvester:
         for t in work:
             q.put(t)
 
-        with self.stats_lock:
-            self.stats.tasks_total = len(work)
+        self.stats.set_tasks_total(len(work))
 
         stop_snap = threading.Event()
         snap_thread = None
@@ -319,6 +289,7 @@ class Harvester:
             snap_thread.start()
 
         def worker() -> None:
+            sess = self.session_factory()
             while True:
                 if self.should_stop():
                     return
@@ -333,6 +304,7 @@ class Harvester:
                 kept_local = 0
                 seen_local = 0
                 err_local = 0
+                task_complete = False
 
                 lang_list = self.langs or [None]
 
@@ -360,7 +332,7 @@ class Harvester:
 
                             try:
                                 data = isbndb_get(
-                                    self.session,
+                                    sess,
                                     url,
                                     params=params,
                                     timeout_s=self.timeout_s,
@@ -383,11 +355,42 @@ class Harvester:
                                 # Make it very obvious in console output
                                 print(f"\n[quota] {qe}")
                                 raise
+                            except ISBNdbError as e:
+                                msg = str(e)
+                                if t.endpoint in ("publisher", "subject") and "401" not in msg:
+                                    url, params = build_task_request(
+                                        endpoint="search",
+                                        query=t.query,
+                                        page=page,
+                                        page_size=self.page_size,
+                                        lang=lang,
+                                    )
+                                    self.ck_write(
+                                        {
+                                            "type": "task_fallback",
+                                            "task_id": tid,
+                                            "query_group": t.group,
+                                            "query": t.query,
+                                            "endpoint": t.endpoint,
+                                            "page": page,
+                                            "ts": time.time(),
+                                            "reason": msg,
+                                            "fallback": "search",
+                                        }
+                                    )
+                                    data = isbndb_get(
+                                        sess,
+                                        url,
+                                        params=params,
+                                        timeout_s=self.timeout_s,
+                                        retries=self.retries,
+                                    )
+                                else:
+                                    raise
                             except Exception:
                                 raise
 
-                            with self.stats_lock:
-                                self.stats.requests_ok += 1
+                            self.stats.inc_requests()
 
                             books = data.get("books") or []
                             if not books:
@@ -395,8 +398,7 @@ class Harvester:
 
                             for b in books:
                                 seen_local += 1
-                                with self.stats_lock:
-                                    self.stats.books_seen += 1
+                                self.stats.inc_books_seen()
 
                                 isbn13, isbn10, f = parse_book(b)
                                 if not isbn13:
@@ -412,6 +414,7 @@ class Harvester:
                                     f["synopsis"],
                                     f["overview"],
                                     f["publisher"],
+                                    field_weights=[2.0, 1.0, 1.5, 0.7, 0.7, 0.5],
                                 )
                                 if js < self.min_score:
                                     continue
@@ -426,12 +429,16 @@ class Harvester:
                                 matched_terms = ", ".join(matched)
                                 tags = build_shopify_tags(f["subjects"], matched_terms, f["publisher"])
 
-                                bookshop_url = f"https://bookshop.org/books/{isbn13}"
-                                aff_url = (
-                                    f"https://bookshop.org/a/{self.bookshop_affiliate_id}/{isbn13}"
-                                    if self.bookshop_affiliate_id
-                                    else ""
-                                )
+                                if self.bookshop_enabled:
+                                    bookshop_url = f"https://bookshop.org/books/{isbn13}"
+                                    aff_url = (
+                                        f"https://bookshop.org/a/{self.bookshop_affiliate_id}/{isbn13}"
+                                        if self.bookshop_affiliate_id
+                                        else ""
+                                    )
+                                else:
+                                    bookshop_url = ""
+                                    aff_url = ""
 
                                 rscore = rank_score(js, pop, is_fic, self.fiction_only, seen_count=1)
 
@@ -440,6 +447,9 @@ class Harvester:
                                     isbn13=isbn13,
                                     title=f["title"],
                                     title_long=f["title_long"],
+                                    subtitle=f["subtitle"],
+                                    edition=f["edition"],
+                                    dimensions=f["dimensions"],
                                     authors=f["authors"],
                                     date_published=f["date_published"],
                                     publisher=f["publisher"],
@@ -492,29 +502,29 @@ class Harvester:
                                             + "\n"
                                         )
 
-                                with self.seen_lock:
-                                    if isbn13 in self.seen:
-                                        self.seen[isbn13] = merge_row(
-                                            self.seen[isbn13], row, fiction_only=self.fiction_only
-                                        )
-                                    else:
-                                        self.seen[isbn13] = row
+                                self.store.upsert(
+                                    isbn13,
+                                    row,
+                                    merge_fn=lambda existing, new: merge_row(
+                                        existing, new, fiction_only=self.fiction_only
+                                    ),
+                                )
 
                                 kept_local += 1
-                                with self.stats_lock:
-                                    self.stats.kept += 1
-                                    self.stats.unique13 = len(self.seen)
+                                self.stats.inc_kept()
+                                self.stats.set_unique13(self.store.size())
 
                             if len(books) < self.page_size:
+                                break
+                            if self.dry_run:
                                 break
                             page += 1
                             if seen_local >= self.max_per_task:
                                 break
-
+                    task_complete = True
                 except Exception as e:
                     err_local += 1
-                    with self.stats_lock:
-                        self.stats.errors += 1
+                    self.stats.inc_errors()
 
                     if self.verbose_task_errors:
                         print(f"\n[task_error] {t.endpoint}:{t.query} page={page} -> {e!r}")
@@ -533,12 +543,11 @@ class Harvester:
                     )
 
                 finally:
-                    with self.stats_lock:
-                        self.stats.tasks_done += 1
+                    self.stats.inc_tasks_done()
 
                     self.ck_write(
                         {
-                            "type": "task_done",
+                            "type": "task_done" if task_complete else "task_incomplete",
                             "task_id": tid,
                             "query_group": t.group,
                             "query": t.query,
@@ -562,13 +571,14 @@ class Harvester:
             while any(t.is_alive() for t in threads):
                 now = time.time()
                 if now - last >= 1.0:
-                    with self.stats_lock:
-                        s = self.stats
+                    s = self.stats.snapshot(unique13=self.store.size())
+                    rates = self.stats.snapshot_rates(unique13=self.store.size())
                     stop_note = " | STOPPING" if self.should_stop() else ""
                     print(
                         f"\rTasks {s.tasks_done}/{s.tasks_total} | "
-                        f"ReqOK {s.requests_ok} | Errors {s.errors} | "
-                        f"Books {s.books_seen} | Kept {s.kept} | Unique13 {s.unique13}{stop_note}",
+                        f"ReqOK {s.requests_made} | Errors {s.errors} | "
+                        f"Books {s.books_seen} | Kept {s.kept} | Unique13 {s.unique13} | "
+                        f"Req/s {rates['requests_per_sec']:.2f} | Books/s {rates['books_per_sec']:.2f}{stop_note}",
                         end="",
                         flush=True,
                     )
@@ -588,11 +598,10 @@ class Harvester:
                 snap_thread.join(timeout=1.0)
             self.close()
 
-        with self.seen_lock:
-            rows = list(self.seen.values())
+        rows = self.store.snapshot_values()
         # Always write final CSV even if empty
         write_full_csv(rows, self.out_path)
-        return self.seen
+        return self.store.snapshot_dict()
 
 
 # -----------------------------
@@ -620,8 +629,10 @@ def harvest(
     snapshot_every_s: int,
     fiction_only: bool,
     bookshop_affiliate_id: Optional[str],
+    bookshop_enabled: bool = True,
     stop_file: Optional[str],
     max_seconds: int,
+    dry_run: bool = False,
     verbose_task_errors: bool = True,
 ) -> Dict[str, BookRow]:
     """
@@ -648,8 +659,10 @@ def harvest(
         snapshot_every_s=snapshot_every_s,
         fiction_only=fiction_only,
         bookshop_affiliate_id=bookshop_affiliate_id,
+        bookshop_enabled=bookshop_enabled,
         stop_file=stop_file,
         max_seconds=max_seconds,
+        dry_run=dry_run,
         verbose_task_errors=verbose_task_errors,
     )
     return h.run()

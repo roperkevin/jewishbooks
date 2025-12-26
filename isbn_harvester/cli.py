@@ -5,7 +5,7 @@ import argparse
 import os
 from typing import List, Optional
 
-from isbn_harvester.export_full import write_full_csv
+from isbn_harvester.export_full import read_full_csv, write_full_csv
 from isbn_harvester.export_shopify import write_shopify_products_csv
 from .config import load_dotenv
 from .covers import CoverUploader
@@ -36,6 +36,8 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--out", default="jewish_books_full.csv", help="Full metadata CSV output (BookRow schema)")
     ap.add_argument("--shopify-out", default=None, help="Optional Shopify Products CSV output (imports to Shopify)")
     ap.add_argument("--shopify-publish", action="store_true", help="Set Shopify Status=active and Published=TRUE")
+    ap.add_argument("--covers-only", action="store_true", help="Run covers only (skip harvest, read full CSV)")
+    ap.add_argument("--full-in", default=None, help="Existing full CSV input (used with --covers-only)")
 
     # Resume / debug
     ap.add_argument("--checkpoint", default=None, help="NDJSON checkpoint path")
@@ -52,6 +54,11 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--timeout", type=int, default=25, help="HTTP timeout seconds")
     ap.add_argument("--min-score", type=int, default=0, help="Minimum Jewish relevance score to keep")
     ap.add_argument("--langs", default="en", help="Comma list of languages to try (e.g. en,he,yi) or empty for none")
+    ap.add_argument("--task-groups", default=None, help="Comma list of task groups to run (e.g. alpha,intent)")
+    ap.add_argument("--task-limit", type=int, default=0, help="Limit number of tasks (0 = no limit)")
+    ap.add_argument("--tasks-file", default=None, help="YAML task config override (publishers, subjects, queries)")
+    ap.add_argument("--dry-run", action="store_true", help="Fetch 1 page per task for a quick smoke run")
+    ap.add_argument("--no-bookshop", action="store_true", help="Disable Bookshop URLs in output")
 
     ap.add_argument("--shuffle-tasks", action="store_true", help="Shuffle tasks for better coverage sooner")
     ap.add_argument("--start-index-jitter", type=int, default=0, help="Randomly start at later pages (spreads load)")
@@ -85,7 +92,13 @@ def main(argv: Optional[List[str]] = None) -> None:
     langs = _split_langs(args.langs)
 
     sess = make_isbndb_session(api_key)
-    tasks = build_tasks(fiction_only=args.fiction_only)
+    task_groups = _split_langs(args.task_groups)
+    tasks = build_tasks(
+        fiction_only=args.fiction_only,
+        groups=task_groups,
+        limit=args.task_limit or None,
+        tasks_file=args.tasks_file,
+    )
 
     print(f"Tasks: {len(tasks)} | fiction_only={args.fiction_only} | langs={langs or ['(none)']}")
     print(f"Output(full): {args.out}")
@@ -98,58 +111,73 @@ def main(argv: Optional[List[str]] = None) -> None:
     if args.max_seconds:
         print(f"Harvest max seconds: {args.max_seconds}")
 
+    if args.covers_only:
+        read_path = args.full_in or args.out
+        if not os.path.exists(read_path):
+            raise SystemExit(f"Covers-only requires an existing full CSV at: {read_path}")
+
+    if args.dry_run:
+        print("[info] dry-run enabled: only 1 page per task")
+
     # -----------------------
     # Harvest (dict pipeline)
     # -----------------------
-    rows_by_isbn13 = harvest(
-        tasks=tasks,
-        isbndb_session=sess,
-        out_path=args.out,
-        raw_jsonl=args.raw_jsonl,
-        checkpoint_path=args.checkpoint,
-        resume=args.resume,
-        max_per_task=args.max_per_task,
-        page_size=args.page_size,
-        concurrency=args.concurrency,
-        rate_per_sec=args.rate_per_sec,
-        burst=args.burst,
-        retries=args.retries,
-        timeout_s=args.timeout,
-        min_score=args.min_score,
-        langs=langs,
-        shuffle_tasks=args.shuffle_tasks,
-        start_index_jitter=args.start_index_jitter,
-        snapshot_every_s=args.snapshot_every,
-        fiction_only=args.fiction_only,
-        bookshop_affiliate_id=affiliate_id,
-        stop_file=args.stop_file,
-        max_seconds=args.max_seconds,
-        verbose_task_errors=True,
-    )
+    rows_by_isbn13 = {}
+    if not args.covers_only:
+        rows_by_isbn13 = harvest(
+            tasks=tasks,
+            isbndb_session=sess,
+            out_path=args.out,
+            raw_jsonl=args.raw_jsonl,
+            checkpoint_path=args.checkpoint,
+            resume=args.resume,
+            max_per_task=args.max_per_task,
+            page_size=args.page_size,
+            concurrency=args.concurrency,
+            rate_per_sec=args.rate_per_sec,
+            burst=args.burst,
+            retries=args.retries,
+            timeout_s=args.timeout,
+            min_score=args.min_score,
+            langs=langs,
+            shuffle_tasks=args.shuffle_tasks,
+            start_index_jitter=args.start_index_jitter,
+            snapshot_every_s=args.snapshot_every,
+            fiction_only=args.fiction_only,
+            bookshop_affiliate_id=affiliate_id,
+            bookshop_enabled=not args.no_bookshop,
+            stop_file=args.stop_file,
+            max_seconds=args.max_seconds,
+            dry_run=args.dry_run,
+            verbose_task_errors=True,
+        )
 
     # Convert to RowStore (covers.py expects RowStore)
-    store = RowStore()
-    for row in rows_by_isbn13.values():
-        store.upsert(row)
+    if args.covers_only:
+        read_path = args.full_in or args.out
+        rows = read_full_csv(read_path)
+        rows_by_isbn13 = {r.isbn13: r for r in rows if r.isbn13}
+    store = RowStore(rows_by_isbn13)
 
     # -----------------------
     # Write outputs (pre-covers)
     # -----------------------
-    rows = store.snapshot_values()
-    rows.sort(key=lambda r: r.rank_score, reverse=True)
+    if not args.covers_only:
+        rows = store.snapshot_values()
+        rows.sort(key=lambda r: r.rank_score, reverse=True)
 
-    write_full_csv(rows, args.out)
-    print(f"Done: wrote {len(rows)} full rows -> {args.out}")
+        write_full_csv(rows, args.out)
+        print(f"Done: wrote {len(rows)} full rows -> {args.out}")
 
-    if args.shopify_out:
-        write_shopify_products_csv(rows, args.shopify_out, publish=args.shopify_publish)
-        print(f"Done: wrote {len(rows)} Shopify rows (with metafields) -> {args.shopify_out}")
+        if args.shopify_out:
+            write_shopify_products_csv(rows, args.shopify_out, publish=args.shopify_publish)
+            print(f"Done: wrote {len(rows)} Shopify rows (with metafields) -> {args.shopify_out}")
 
     # -----------------------
     # Covers (CoverUploader)
     # -----------------------
     uploaded = 0
-    if args.covers:
+    if args.covers or args.covers_only:
         s3_bucket = (os.getenv("S3_BUCKET") or "").strip()
         aws_region = (os.getenv("AWS_REGION") or "us-west-2").strip()
         cloudfront_domain = (os.getenv("CLOUDFRONT_DOMAIN") or "").strip() or None
