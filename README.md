@@ -89,6 +89,12 @@ Debug logging for request-level detail:
 python -m isbn_harvester --log-level debug --dry-run --task-limit 2
 ```
 
+Children's books only:
+
+```
+python -m isbn_harvester --task-groups children --task-limit 50
+```
+
 Harvest Hebrew + English content:
 
 ```
@@ -128,6 +134,7 @@ Keys supported in the YAML:
 - `base_queries`
 - `intent_queries`
 - `fiction_queries`
+- `children_queries`
 - `exclude_queries`
 
 ## Outputs

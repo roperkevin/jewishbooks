@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import re
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 SCORE_TERMS = {
     "jewish": 6, "judaism": 6, "jews": 5, "hebrew": 4, "yiddish": 4,
@@ -46,6 +46,7 @@ _WORDISH = re.compile(r"^[a-z0-9]+$")
 _SYNONYM_REPLACEMENTS = {
     "anti-semitism": "antisemitism",
     "anti semitism": "antisemitism",
+    "antisemitism": "antisemitism",
     "chassidic": "hasidic",
     "chasidic": "hasidic",
     "shabbos": "shabbat",
@@ -61,9 +62,9 @@ def _apply_synonyms(hay: str) -> str:
 def _normalize_haystack(*texts: str) -> str:
     hay = " ".join([t or "" for t in texts])
     hay = hay.lower()
+    hay = _apply_synonyms(hay)
     hay = re.sub(r"[-–—]", " ", hay)
     hay = re.sub(r"\s+", " ", hay).strip()
-    hay = _apply_synonyms(hay)
     return hay
 
 

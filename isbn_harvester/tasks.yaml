@@ -1,7 +1,18 @@
 publishers:
   - JPS
+  - ArtScroll
+  - Mesorah
+  - Feldheim
   - Schocken
+  - Koren
+  - Maggid
+  - OU Press
   - Jewish Publication Society
+  - Brandeis University Press
+  - NYU Press
+  - SUNY Press
+  - Indiana University Press
+  - Wayne State University Press
   - Yad Vashem
   - Ktav
   - Gefen
@@ -11,11 +22,25 @@ publishers:
 
 subjects:
   - Judaism
+  - Jewish studies
+  - Jewish philosophy
+  - Jewish law
+  - Talmud
+  - Midrash
+  - Zionism
+  - Israel history
+  - Holocaust studies
   - Jewish history
   - Holocaust
   - Israel
   - Antisemitism
   - Jewish fiction
+  - Jewish biography
+  - Jewish memoir
+  - Sephardic
+  - Mizrahi
+  - Yiddish literature
+  - Hebrew literature
   - Yiddish language
   - Hebrew language
   - Kabbalah
@@ -48,10 +73,17 @@ base_queries:
   - Bat Mitzvah
   - Sephardic
   - Ashkenazi
+  - Mizrahi
+  - Jewish literature
+  - Hebrew literature
+  - Yiddish literature
 
 intent_queries:
   - Jewish memoir
   - Jewish biography
+  - Jewish children's book
+  - Jewish cookbook
+  - Kosher recipes
   - Jewish cookbook kosher
   - Jewish education
   - Jewish philosophy
@@ -60,11 +92,28 @@ intent_queries:
   - Torah commentary
   - History of Israel
   - Israel politics
+  - Israel-Palestine
   - Holocaust memoir
   - Holocaust survivor testimony
   - Antisemitism history
   - Jewish diaspora
   - Jewish immigration
+  - Jewish folklore
+  - Jewish genealogy
+  - Synagogue history
+  - Jewish poetry
+  - Hebrew grammar
+
+children_queries:
+  - Jewish children's book
+  - Jewish picture book
+  - Jewish early reader
+  - Jewish middle grade
+  - Jewish young adult
+  - Hanukkah children's book
+  - Passover children's book
+  - Holocaust middle grade
+  - Jewish bedtime story
 
 fiction_queries:
   - Jewish novel
@@ -77,7 +126,19 @@ fiction_queries:
   - Israeli thriller
   - Holocaust fiction
   - Jewish short stories
+  - Jewish historical fiction
+  - Jewish family saga
+  - Israeli detective
+  - Israeli mystery
+  - Holocaust historical fiction
+  - Jewish coming of age
+  - Jewish fantasy
+  - Jewish speculative fiction
+  - Jewish science fiction
 
 exclude_queries:
   - Christmas
   - Easter
+  - Christian fiction
+  - New Testament
+  - Jesus

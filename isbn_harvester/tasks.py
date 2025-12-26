@@ -13,7 +13,12 @@ from .models import TaskSpec
 
 
 def _read_tasks_file(path: Path) -> Dict[str, List[str]]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except FileNotFoundError as e:
+        raise SystemExit(f"Tasks file not found: {path}") from e
+    except Exception as e:
+        raise SystemExit(f"Failed to read tasks file: {path} ({e})") from e
     logger.info("Loaded tasks file: %s", path)
     out: Dict[str, List[str]] = {}
     for key, value in data.items():
@@ -59,6 +64,7 @@ def build_tasks(
     base_queries = data.get("base_queries", [])
     intent_queries = data.get("intent_queries", [])
     fiction_queries = data.get("fiction_queries", [])
+    children_queries = data.get("children_queries", [])
     exclude_queries = {q.strip().lower() for q in data.get("exclude_queries", []) if str(q).strip()}
 
     if fiction_only:
@@ -74,6 +80,8 @@ def build_tasks(
         out.append(TaskSpec(endpoint="search", query=q, group="alpha"))
     for q in intent_queries:
         out.append(TaskSpec(endpoint="search", query=q, group="intent"))
+    for q in children_queries:
+        out.append(TaskSpec(endpoint="search", query=q, group="children"))
 
     ded = _dedupe_tasks(out)
     if exclude_queries:

@@ -83,6 +83,9 @@ def merge_row(existing: BookRow, new: BookRow, fiction_only: bool) -> BookRow:
         elif _completeness(new) == _completeness(existing) and new.rank_score > existing.rank_score:
             pick = new
 
+    subtitle = pick.subtitle or existing.subtitle
+    edition = pick.edition or existing.edition
+    dimensions = pick.dimensions or existing.dimensions
     cover_url = pick.cover_url or existing.cover_url
     cover_url_original = pick.cover_url_original or existing.cover_url_original
     s3_cover_key = pick.s3_cover_key or existing.s3_cover_key
@@ -110,9 +113,9 @@ def merge_row(existing: BookRow, new: BookRow, fiction_only: bool) -> BookRow:
         isbn13=pick.isbn13,
         title=pick.title,
         title_long=pick.title_long,
-        subtitle=pick.subtitle,
-        edition=pick.edition,
-        dimensions=pick.dimensions,
+        subtitle=subtitle,
+        edition=edition,
+        dimensions=dimensions,
         authors=pick.authors,
         date_published=pick.date_published,
         publisher=pick.publisher,
