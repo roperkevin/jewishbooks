@@ -4,3 +4,4 @@ tqdm
 boto3
 pytest
 pyyaml
+rich

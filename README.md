@@ -21,6 +21,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Note: `rich` is included for nicer console logs (automatic formatting and color).
+
 ## Environment
 
 Create a `.env` file in the project root with:
