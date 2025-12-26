@@ -89,6 +89,18 @@ Debug logging for request-level detail:
 python -m isbn_harvester --log-level debug --dry-run --task-limit 2
 ```
 
+Generate a summary report and dashboard:
+
+```
+python -m isbn_harvester --report report.md --dashboard dashboard.html
+```
+
+Create a top-100 sample CSV:
+
+```
+python -m isbn_harvester --sample-top 100 --sample-out jewish_books_sample.csv
+```
+
 Children's books only:
 
 ```
@@ -117,6 +129,18 @@ Generate Shopify CSV without Bookshop URLs:
 
 ```
 python -m isbn_harvester --no-bookshop --shopify-out jewish_books_shopify.csv
+```
+
+Verify cover URLs and prune dead links:
+
+```
+python -m isbn_harvester --verify --verify-timeout 8 --verify-concurrency 8
+```
+
+Profile API request latency and error rate:
+
+```
+python -m isbn_harvester --profile profile.json --dry-run --task-limit 5
 ```
 
 ## Tasks Configuration
@@ -210,6 +234,22 @@ Keys supported in the YAML:
 | `--covers-skip-existing-s3` | `False` | Reuse any existing S3 object under `covers/{isbn13}/` |
 | `--covers-prefer-original` | `False` | Prefer original/high-res cover URL when available |
 | `--covers-max-seconds` | `0` | Max runtime seconds for covers (0 = no limit) |
+
+### Reporting and QA
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--report` | `None` | Write a summary report (.md or .html) |
+| `--sample-top` | `0` | Write top-N rows by rank_score to sample CSV |
+| `--sample-out` | `None` | Sample CSV output path (used with `--sample-top`) |
+| `--dashboard` | `None` | Write an HTML dashboard for browsing results |
+| `--dashboard-max` | `500` | Max rows to include in dashboard |
+| `--verify` | `False` | Verify cover URLs and prune dead links |
+| `--verify-timeout` | `10` | Timeout for cover verification calls |
+| `--verify-concurrency` | `6` | Parallel workers for verification |
+| `--verify-max` | `0` | Max rows to verify (0 = all) |
+| `--verify-out` | `None` | Output CSV path after verification (default: `--out`) |
+| `--profile` | `None` | Write request profiling summary (JSON) |
 
 ## Troubleshooting
 

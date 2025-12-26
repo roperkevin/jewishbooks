@@ -6,8 +6,12 @@ import logging
 import os
 from typing import List, Optional
 
+from isbn_harvester.dashboard import write_dashboard
 from isbn_harvester.export_full import read_full_csv, write_full_csv
 from isbn_harvester.export_shopify import write_shopify_products_csv
+from isbn_harvester.profiler import RequestProfiler
+from isbn_harvester.report import write_report
+from isbn_harvester.verify import verify_rows
 from .config import load_dotenv
 from .covers import CoverUploader
 from .harvest import harvest
@@ -47,6 +51,17 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--shopify-publish", action="store_true", help="Set Shopify Status=active and Published=TRUE")
     ap.add_argument("--covers-only", action="store_true", help="Run covers only (skip harvest, read full CSV)")
     ap.add_argument("--full-in", default=None, help="Existing full CSV input (used with --covers-only)")
+    ap.add_argument("--report", default=None, help="Write a summary report (.md or .html)")
+    ap.add_argument("--sample-top", type=int, default=0, help="Write top-N rows by rank_score to sample CSV")
+    ap.add_argument("--sample-out", default=None, help="Sample CSV output path (used with --sample-top)")
+    ap.add_argument("--dashboard", default=None, help="Write an HTML dashboard for browsing results")
+    ap.add_argument("--dashboard-max", type=int, default=500, help="Max rows to include in dashboard")
+    ap.add_argument("--verify", action="store_true", help="Verify cover URLs and prune dead links")
+    ap.add_argument("--verify-timeout", type=int, default=10, help="Timeout for cover verification calls")
+    ap.add_argument("--verify-concurrency", type=int, default=6, help="Parallel workers for verification")
+    ap.add_argument("--verify-max", type=int, default=0, help="Max rows to verify (0 = all)")
+    ap.add_argument("--verify-out", default=None, help="Output CSV path after verification (default: --out)")
+    ap.add_argument("--profile", default=None, help="Write request profiling summary (JSON)")
 
     # Resume / debug
     ap.add_argument("--checkpoint", default=None, help="NDJSON checkpoint path")
@@ -134,6 +149,16 @@ def main(argv: Optional[List[str]] = None) -> None:
     logger.info("Output(full): %s", args.out)
     if args.shopify_out:
         logger.info("Output(shopify): %s (publish=%s)", args.shopify_out, args.shopify_publish)
+    if args.report:
+        logger.info("Report: %s", args.report)
+    if args.sample_top:
+        logger.info("Sample: top %s -> %s", args.sample_top, args.sample_out or "jewish_books_sample.csv")
+    if args.dashboard:
+        logger.info("Dashboard: %s (max rows=%s)", args.dashboard, args.dashboard_max)
+    if args.verify:
+        logger.info("Verify: enabled (timeout=%s, concurrency=%s)", args.verify_timeout, args.verify_concurrency)
+    if args.profile:
+        logger.info("Profile: %s", args.profile)
     if args.checkpoint:
         logger.info("Checkpoint: %s (resume=%s)", args.checkpoint, args.resume)
     if args.stop_file:
@@ -153,6 +178,8 @@ def main(argv: Optional[List[str]] = None) -> None:
     # Harvest (dict pipeline)
     # -----------------------
     rows_by_isbn13 = {}
+    profiler = RequestProfiler() if args.profile else None
+
     if not args.covers_only:
         rows_by_isbn13 = harvest(
             tasks=tasks,
@@ -179,6 +206,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             stop_file=args.stop_file,
             max_seconds=args.max_seconds,
             dry_run=args.dry_run,
+            profiler=profiler,
             verbose_task_errors=True,
         )
 
@@ -206,6 +234,31 @@ def main(argv: Optional[List[str]] = None) -> None:
                 len(rows),
                 args.shopify_out,
             )
+
+        if args.sample_top and args.sample_top > 0:
+            sample_out = args.sample_out or "jewish_books_sample.csv"
+            sample_rows = rows[: args.sample_top]
+            write_full_csv(sample_rows, sample_out)
+            logger.info("Done: wrote %s sample rows -> %s", len(sample_rows), sample_out)
+
+        if args.report:
+            write_report(rows, args.report)
+            logger.info("Done: wrote report -> %s", args.report)
+
+        if args.dashboard:
+            write_dashboard(rows, args.dashboard, max_rows=args.dashboard_max)
+            logger.info("Done: wrote dashboard -> %s", args.dashboard)
+
+        if args.verify:
+            verified = verify_rows(
+                rows,
+                max_rows=args.verify_max,
+                concurrency=args.verify_concurrency,
+                timeout_s=args.verify_timeout,
+            )
+            out_path = args.verify_out or args.out
+            write_full_csv(verified, out_path)
+            logger.info("Done: wrote verified rows -> %s", out_path)
 
     # -----------------------
     # Covers (CoverUploader)
@@ -267,6 +320,35 @@ def main(argv: Optional[List[str]] = None) -> None:
             )
 
         logger.info("Covers: uploaded/reused %s.", uploaded)
+
+        if args.sample_top and args.sample_top > 0:
+            sample_out = args.sample_out or "jewish_books_sample.csv"
+            sample_rows = rows[: args.sample_top]
+            write_full_csv(sample_rows, sample_out)
+            logger.info("Done: wrote %s sample rows -> %s", len(sample_rows), sample_out)
+
+        if args.report:
+            write_report(rows, args.report)
+            logger.info("Done: wrote report -> %s", args.report)
+
+        if args.dashboard:
+            write_dashboard(rows, args.dashboard, max_rows=args.dashboard_max)
+            logger.info("Done: wrote dashboard -> %s", args.dashboard)
+
+        if args.verify:
+            verified = verify_rows(
+                rows,
+                max_rows=args.verify_max,
+                concurrency=args.verify_concurrency,
+                timeout_s=args.verify_timeout,
+            )
+            out_path = args.verify_out or args.out
+            write_full_csv(verified, out_path)
+            logger.info("Done: wrote verified rows -> %s", out_path)
+
+    if profiler and args.profile:
+        profiler.write(args.profile)
+        logger.info("Done: wrote profile -> %s", args.profile)
 
     # Helpful warning: missing images
     rows_final = store.snapshot_values()

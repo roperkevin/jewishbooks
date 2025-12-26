@@ -25,6 +25,7 @@ from .models import BookRow, TaskSpec
 from .normalize import build_shopify_tags
 from .parse import parse_book
 from .scoring import rank_score, jewish_relevance_score, fiction_flag, popularity_proxy
+from .profiler import RequestProfiler
 from .stats_tracker import StatsTracker
 from .store import RowStore
 
@@ -176,6 +177,7 @@ class Harvester:
         fiction_only: bool,
         bookshop_affiliate_id: Optional[str],
         bookshop_enabled: bool = True,
+        profiler: Optional[RequestProfiler] = None,
         stop_file: Optional[str],
         max_seconds: int,
         dry_run: bool = False,
@@ -202,6 +204,7 @@ class Harvester:
         self.fiction_only = fiction_only
         self.bookshop_affiliate_id = bookshop_affiliate_id
         self.bookshop_enabled = bookshop_enabled
+        self.profiler = profiler
 
         self.stop_file = stop_file
         self.max_seconds = max_seconds
@@ -339,6 +342,7 @@ class Harvester:
                             )
 
                             try:
+                                req_start = time.time()
                                 data = isbndb_get(
                                     sess,
                                     url,
@@ -346,6 +350,8 @@ class Harvester:
                                     timeout_s=self.timeout_s,
                                     retries=self.retries,
                                 )
+                                if self.profiler:
+                                    self.profiler.record(t.endpoint, time.time() - req_start, ok=True)
                             except ISBNdbQuotaError as qe:
                                 self.quota_stop.set()
                                 self.ck_write(
@@ -365,6 +371,8 @@ class Harvester:
                                 logger.error("Quota exhausted during %s:%s page=%s", t.endpoint, t.query, page)
                                 raise
                             except ISBNdbError as e:
+                                if self.profiler:
+                                    self.profiler.record(t.endpoint, time.time() - req_start, ok=False)
                                 msg = str(e)
                                 if t.endpoint in ("publisher", "subject") and "401" not in msg:
                                     logger.warning("Fallback to search for %s:%s due to %s", t.endpoint, t.query, msg)
@@ -395,9 +403,13 @@ class Harvester:
                                         timeout_s=self.timeout_s,
                                         retries=self.retries,
                                     )
+                                    if self.profiler:
+                                        self.profiler.record("search_fallback", time.time() - req_start, ok=True)
                                 else:
                                     raise
                             except Exception:
+                                if self.profiler:
+                                    self.profiler.record(t.endpoint, time.time() - req_start, ok=False)
                                 raise
 
                             self.stats.inc_requests()
@@ -641,6 +653,7 @@ def harvest(
     fiction_only: bool,
     bookshop_affiliate_id: Optional[str],
     bookshop_enabled: bool = True,
+    profiler: Optional[RequestProfiler] = None,
     stop_file: Optional[str],
     max_seconds: int,
     dry_run: bool = False,
@@ -671,6 +684,7 @@ def harvest(
         fiction_only=fiction_only,
         bookshop_affiliate_id=bookshop_affiliate_id,
         bookshop_enabled=bookshop_enabled,
+        profiler=profiler,
         stop_file=stop_file,
         max_seconds=max_seconds,
         dry_run=dry_run,
