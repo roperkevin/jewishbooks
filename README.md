@@ -161,6 +161,57 @@ Keys supported in the YAML:
 - `children_queries`
 - `exclude_queries`
 
+## Taxonomy Classification
+
+Place your taxonomy file at `taxonomy/taxonomy.json` (or pass a custom path with `--taxonomy`).
+
+Validate:
+
+```
+python taxonomy/validate_taxonomy.py taxonomy/taxonomy.json
+```
+
+Coverage report on a CSV:
+
+```
+python taxonomy/coverage_report.py --csv jewish_books_full.csv
+```
+
+Run with taxonomy enabled:
+
+```
+python -m isbn_harvester --taxonomy taxonomy/taxonomy.json --taxonomy-debug taxonomy_debug.jsonl --taxonomy-review taxonomy_review.jsonl
+```
+
+Sample input and output:
+
+```
+book_doc = {
+  "title": "The Shtetl Bride",
+  "subtitle": "",
+  "title_long": "The Shtetl Bride: A Novel",
+  "description": "A Holocaust-era love story set in Eastern Europe...",
+  "subjects": "Holocaust, Jewish fiction, Shtetl life",
+  "publisher": "Schocken"
+}
+
+assigned = {
+  "primary_genre": "historical_jewish_fiction",
+  "jewish_themes": ["holocaust_fiction"],
+  "geography": ["eastern_europe_shtetl"],
+  "historical_era": ["world_war_ii"],
+  "high_level_categories": ["Genre & Form", "Place & Setting"],
+  "tags": [
+    "Genre: Historical Jewish Fiction",
+    "Theme: Holocaust Fiction",
+    "Place: Eastern Europe (Shtetl Life)",
+    "Era: World War II",
+    "High: Genre & Form",
+    "High: Place & Setting"
+  ]
+}
+```
+
 ## Outputs
 
 - Full CSV: `jewish_books_full.csv` (includes all enriched metadata and cover fields)
@@ -250,6 +301,14 @@ Keys supported in the YAML:
 | `--verify-max` | `0` | Max rows to verify (0 = all) |
 | `--verify-out` | `None` | Output CSV path after verification (default: `--out`) |
 | `--profile` | `None` | Write request profiling summary (JSON) |
+
+### Taxonomy
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--taxonomy` | `taxonomy/taxonomy.json` | Taxonomy JSON path |
+| `--taxonomy-debug` | `None` | Write taxonomy debug JSONL |
+| `--taxonomy-review` | `None` | Write taxonomy review queue JSONL |
 
 ## Troubleshooting
 

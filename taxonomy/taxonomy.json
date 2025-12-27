@@ -1,0 +1,586 @@
+{
+  "primary_genre": [
+    {
+      "id": "literary_jewish_fiction",
+      "label": "Literary Jewish Fiction",
+      "high_level_category": "Genre & Form",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["identity", "memory", "family", "introspective", "literary"],
+        "phrases": ["coming of age", "intergenerational story", "family saga"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "historical_jewish_fiction",
+      "label": "Historical Jewish Fiction",
+      "high_level_category": "Genre & Form",
+      "weight": 3.0,
+      "signals": {
+        "keywords": ["historical", "period", "empire", "war"],
+        "phrases": ["set during", "based on historical events"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "jewish_mystery",
+      "label": "Jewish Mystery",
+      "high_level_category": "Genre & Form",
+      "weight": 3.5,
+      "signals": {
+        "keywords": ["murder", "detective", "investigation", "crime"],
+        "phrases": ["solves a murder", "private investigator"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "jewish_fantasy",
+      "label": "Jewish Fantasy",
+      "high_level_category": "Genre & Form",
+      "weight": 3.5,
+      "signals": {
+        "keywords": ["magic", "spell", "demon", "angel"],
+        "regex": ["\\b(golem|dybbuk|lilith)\\b"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "jewish_science_fiction",
+      "label": "Jewish Science Fiction",
+      "high_level_category": "Genre & Form",
+      "weight": 3.5,
+      "signals": {
+        "keywords": ["space", "future", "ai", "planet"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "jewish_romance",
+      "label": "Jewish Romance",
+      "high_level_category": "Genre & Form",
+      "weight": 3.0,
+      "signals": {
+        "keywords": ["romance", "love story", "courtship"],
+        "phrases": ["falls in love", "romantic relationship"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "jewish_thriller",
+      "label": "Jewish Thriller",
+      "high_level_category": "Genre & Form",
+      "weight": 3.0,
+      "signals": {
+        "keywords": ["thriller", "conspiracy", "spy", "espionage", "terror"],
+        "phrases": ["race against time"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "jewish_coming_of_age",
+      "label": "Jewish Coming of Age",
+      "high_level_category": "Genre & Form",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["coming of age", "teen", "adolescence", "bar mitzvah", "bat mitzvah"],
+        "phrases": ["grows up", "young adult"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "jewish_short_stories",
+      "label": "Jewish Short Stories",
+      "high_level_category": "Genre & Form",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["short stories", "story collection", "anthology"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "jewish_magical_realism",
+      "label": "Jewish Magical Realism",
+      "high_level_category": "Genre & Form",
+      "weight": 2.8,
+      "signals": {
+        "keywords": ["magical realism", "mythic", "surreal"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "jewish_speculative",
+      "label": "Jewish Speculative Fiction",
+      "high_level_category": "Genre & Form",
+      "weight": 2.8,
+      "signals": {
+        "keywords": ["speculative", "alternate history", "what if"],
+        "phrases": ["alternate timeline"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "jewish_family_saga",
+      "label": "Jewish Family Saga",
+      "high_level_category": "Genre & Form",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["family saga", "generations", "dynasty", "intergenerational"],
+        "phrases": ["spans generations"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    }
+  ],
+
+  "jewish_themes": [
+    {
+      "id": "holocaust_fiction",
+      "label": "Holocaust Fiction",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 5.0,
+      "signals": {
+        "keywords": ["shoah", "ghetto", "nazi", "deportation"],
+        "phrases": ["concentration camp", "death camp"],
+        "regex": ["\\b(auschwitz|treblinka|majdanek)\\b"]
+      },
+      "negative_signals": {
+        "keywords": ["memoir", "testimony", "nonfiction"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "post_holocaust_memory",
+      "label": "Post-Holocaust Memory",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 3.5,
+      "signals": {
+        "keywords": ["survivor", "memory", "inheritance"],
+        "phrases": ["second generation", "after the war"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "jewish_identity",
+      "label": "Jewish Identity",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["identity", "belonging", "heritage", "assimilation"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "assimilation",
+      "label": "Assimilation & Passing",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["assimilation", "passing", "hidden"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "antisemitism",
+      "label": "Antisemitism",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 3.0,
+      "signals": {
+        "keywords": ["antisemitism", "persecution", "hatred"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "jewish_family_life",
+      "label": "Jewish Family Life",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["family", "parents", "children"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "immigration_diaspora",
+      "label": "Immigration & Diaspora",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["immigration", "emigration", "diaspora", "exile", "refugee"],
+        "phrases": ["new country", "new life"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "israel_palestine",
+      "label": "Israel-Palestine Conflict",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 3.0,
+      "signals": {
+        "keywords": ["israel-palestine", "intifada", "occupation"],
+        "phrases": ["peace process", "two-state"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "faith_crisis",
+      "label": "Faith & Doubt",
+      "high_level_category": "Jewish Themes & Meaning",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["faith", "doubt", "questioning", "belief"],
+        "phrases": ["crisis of faith"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    }
+  ],
+
+  "geography": [
+    {
+      "id": "eastern_europe_shtetl",
+      "label": "Eastern Europe (Shtetl Life)",
+      "high_level_category": "Place & Diaspora",
+      "weight": 3.5,
+      "signals": {
+        "keywords": ["shtetl", "pale of settlement"],
+        "regex": ["\\b(vilna|warsaw|odessa|lviv|kiev)\\b"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "american_jewish",
+      "label": "American Jewish Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["brooklyn", "new york", "immigrant"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "israeli_fiction",
+      "label": "Israeli Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 3.5,
+      "signals": {
+        "keywords": ["israel", "jerusalem", "tel aviv", "kibbutz"]
+      },
+      "applies_to_fields": ["title", "description", "subjects"]
+    },
+    {
+      "id": "uk_jewish",
+      "label": "UK Jewish Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["london", "manchester", "british"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "canada_jewish",
+      "label": "Canadian Jewish Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["montreal", "toronto", "canadian"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "latin_america",
+      "label": "Latin American Jewish Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["argentina", "brazil", "mexico", "latin america", "buenos aires"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "north_africa_mizrahi",
+      "label": "North Africa & Mizrahi",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["morocco", "algeria", "tunisia", "mizrahi", "sephardi"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "france_jewish",
+      "label": "France Jewish Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["france", "paris", "marseille"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "germany_jewish",
+      "label": "Germany Jewish Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["germany", "berlin", "munich", "hamburg"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "poland_jewish",
+      "label": "Poland Jewish Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["poland", "krakow", "lodz", "warsaw"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "russia_jewish",
+      "label": "Russia Jewish Fiction",
+      "high_level_category": "Place & Diaspora",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["russia", "moscow", "st petersburg", "soviet"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    }
+  ],
+
+  "historical_era": [
+    {
+      "id": "biblical_era",
+      "label": "Biblical Era",
+      "high_level_category": "Time & History",
+      "weight": 4.0,
+      "signals": {
+        "keywords": ["biblical", "torah"],
+        "phrases": ["ancient israel"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "world_war_ii",
+      "label": "World War II",
+      "high_level_category": "Time & History",
+      "weight": 4.5,
+      "signals": {
+        "keywords": ["world war ii", "occupation", "nazi"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "contemporary",
+      "label": "Contemporary",
+      "high_level_category": "Time & History",
+      "weight": 1.0,
+      "signals": {
+        "keywords": ["modern", "today", "contemporary"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "interwar",
+      "label": "Interwar Period",
+      "high_level_category": "Time & History",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["interwar", "between the wars", "1920s", "1930s"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "postwar",
+      "label": "Postwar (1945-1960s)",
+      "high_level_category": "Time & History",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["postwar", "after the war", "1950s", "1960s"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "modern_israel",
+      "label": "Modern Israel",
+      "high_level_category": "Time & History",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["modern israel", "statehood", "zionist state"],
+        "phrases": ["state of israel"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "six_day_war",
+      "label": "Six-Day War (1967)",
+      "high_level_category": "Time & History",
+      "weight": 3.0,
+      "signals": {
+        "keywords": ["six-day war", "1967 war", "june war"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "yom_kippur_war",
+      "label": "Yom Kippur War (1973)",
+      "high_level_category": "Time & History",
+      "weight": 3.0,
+      "signals": {
+        "keywords": ["yom kippur war", "1973 war"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    }
+  ],
+
+  "religious_orientation": [
+    {
+      "id": "orthodox",
+      "label": "Orthodox Jewish Fiction",
+      "high_level_category": "Religious & Cultural Expression",
+      "weight": 3.0,
+      "signals": {
+        "keywords": ["orthodox", "yeshiva", "rabbi", "halacha"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "secular",
+      "label": "Secular Jewish Fiction",
+      "high_level_category": "Religious & Cultural Expression",
+      "weight": 1.5,
+      "signals": {
+        "keywords": ["secular", "cultural jew"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "reform",
+      "label": "Reform Jewish Fiction",
+      "high_level_category": "Religious & Cultural Expression",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["reform", "reform temple"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "conservative",
+      "label": "Conservative Jewish Fiction",
+      "high_level_category": "Religious & Cultural Expression",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["conservative judaism", "conservative synagogue"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    },
+    {
+      "id": "hasidic",
+      "label": "Hasidic Fiction",
+      "high_level_category": "Religious & Cultural Expression",
+      "weight": 2.5,
+      "signals": {
+        "keywords": ["hasidic", "rebbe", "tish"]
+      },
+      "applies_to_fields": ["description", "subjects"]
+    }
+  ],
+
+  "character_focus": [
+    {
+      "id": "jewish_women",
+      "label": "Jewish Women",
+      "high_level_category": "Characters & Social Lens",
+      "weight": 1.5,
+      "signals": {
+        "keywords": ["woman", "mother", "daughter"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "jewish_children",
+      "label": "Jewish Children & Youth",
+      "high_level_category": "Characters & Social Lens",
+      "weight": 1.5,
+      "signals": {
+        "keywords": ["child", "teen"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "jewish_elderly",
+      "label": "Jewish Elders",
+      "high_level_category": "Characters & Social Lens",
+      "weight": 1.5,
+      "signals": {
+        "keywords": ["elder", "grandmother", "grandfather", "aging"]
+      },
+      "applies_to_fields": ["description"]
+    }
+  ],
+
+  "narrative_style": [
+    {
+      "id": "multi_generational",
+      "label": "Multi-Generational Saga",
+      "high_level_category": "Narrative Style & Tone",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["generations", "descendants"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "dual_timeline",
+      "label": "Dual Timeline",
+      "high_level_category": "Narrative Style & Tone",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["dual timeline", "two timelines", "past and present"]
+      },
+      "applies_to_fields": ["description"]
+    }
+  ],
+
+  "emotional_tone": [
+    {
+      "id": "tragic",
+      "label": "Tragic",
+      "high_level_category": "Narrative Style & Tone",
+      "weight": 2.0,
+      "signals": {
+        "keywords": ["tragic", "loss", "grief"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "hopeful",
+      "label": "Hopeful",
+      "high_level_category": "Narrative Style & Tone",
+      "weight": 1.5,
+      "signals": {
+        "keywords": ["hope", "redemption"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "bittersweet",
+      "label": "Bittersweet",
+      "high_level_category": "Narrative Style & Tone",
+      "weight": 1.5,
+      "signals": {
+        "keywords": ["bittersweet", "melancholy"]
+      },
+      "applies_to_fields": ["description"]
+    },
+    {
+      "id": "darkly_comic",
+      "label": "Darkly Comic",
+      "high_level_category": "Narrative Style & Tone",
+      "weight": 1.5,
+      "signals": {
+        "keywords": ["darkly comic", "dark humor", "satire", "satirical"]
+      },
+      "applies_to_fields": ["description"]
+    }
+  ]
+}

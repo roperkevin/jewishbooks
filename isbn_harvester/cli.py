@@ -6,18 +6,19 @@ import logging
 import os
 from typing import List, Optional
 
-from isbn_harvester.dashboard import write_dashboard
-from isbn_harvester.export_full import read_full_csv, write_full_csv
-from isbn_harvester.export_shopify import write_shopify_products_csv
-from isbn_harvester.profiler import RequestProfiler
-from isbn_harvester.report import write_report
-from isbn_harvester.verify import verify_rows
+from isbn_harvester.enrich.taxonomy_assign import apply_taxonomy
+from isbn_harvester.enrich.verify import verify_rows
+from isbn_harvester.integrations.covers import CoverUploader
+from isbn_harvester.integrations.http_client import TokenBucket, make_isbndb_session
+from isbn_harvester.integrations.profiler import RequestProfiler
+from isbn_harvester.core.harvest import harvest
+from isbn_harvester.core.store import RowStore
+from isbn_harvester.core.tasks import build_tasks
+from isbn_harvester.io.dashboard import write_dashboard
+from isbn_harvester.io.export_full import read_full_csv, write_full_csv
+from isbn_harvester.io.export_shopify import write_shopify_products_csv
+from isbn_harvester.io.report import write_report
 from .config import load_dotenv
-from .covers import CoverUploader
-from .harvest import harvest
-from .http_client import TokenBucket, make_isbndb_session
-from .store import RowStore
-from .tasks import build_tasks
 
 
 LOG_LEVELS = {
@@ -56,6 +57,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--sample-out", default=None, help="Sample CSV output path (used with --sample-top)")
     ap.add_argument("--dashboard", default=None, help="Write an HTML dashboard for browsing results")
     ap.add_argument("--dashboard-max", type=int, default=500, help="Max rows to include in dashboard")
+    ap.add_argument("--taxonomy", default="taxonomy/taxonomy.json", help="Taxonomy JSON path")
+    ap.add_argument("--taxonomy-debug", default=None, help="Write taxonomy debug JSONL")
+    ap.add_argument("--taxonomy-review", default=None, help="Write taxonomy review queue JSONL")
     ap.add_argument("--verify", action="store_true", help="Verify cover URLs and prune dead links")
     ap.add_argument("--verify-timeout", type=int, default=10, help="Timeout for cover verification calls")
     ap.add_argument("--verify-concurrency", type=int, default=6, help="Parallel workers for verification")
@@ -159,6 +163,8 @@ def main(argv: Optional[List[str]] = None) -> None:
         logger.info("Verify: enabled (timeout=%s, concurrency=%s)", args.verify_timeout, args.verify_concurrency)
     if args.profile:
         logger.info("Profile: %s", args.profile)
+    if args.taxonomy:
+        logger.info("Taxonomy: %s", args.taxonomy)
     if args.checkpoint:
         logger.info("Checkpoint: %s (resume=%s)", args.checkpoint, args.resume)
     if args.stop_file:
@@ -216,6 +222,19 @@ def main(argv: Optional[List[str]] = None) -> None:
         rows = read_full_csv(read_path)
         rows_by_isbn13 = {r.isbn13: r for r in rows if r.isbn13}
     store = RowStore(rows_by_isbn13)
+
+    if args.taxonomy:
+        tax_path = args.taxonomy
+        if not os.path.exists(tax_path):
+            raise SystemExit(f"Taxonomy file not found: {tax_path}")
+        rows = store.snapshot_values()
+        tax_rows = apply_taxonomy(
+            rows,
+            tax_path,
+            review_queue_path=args.taxonomy_review,
+            debug_path=args.taxonomy_debug,
+        )
+        store = RowStore({r.isbn13: r for r in tax_rows})
 
     # -----------------------
     # Write outputs (pre-covers)

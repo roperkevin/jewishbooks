@@ -1,4 +1,4 @@
-from isbn_harvester.scoring import jewish_relevance_score, fiction_flag
+from isbn_harvester.core.scoring import jewish_relevance_score, fiction_flag
 
 
 def test_jewish_relevance_score_positive() -> None:

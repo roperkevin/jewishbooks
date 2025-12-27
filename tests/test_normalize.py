@@ -1,10 +1,10 @@
-from isbn_harvester.normalize import (
+from isbn_harvester.core.normalize import (
     isbn10_to_isbn13,
     is_valid_isbn10,
     is_valid_isbn13,
     normalize_isbn,
 )
-from isbn_harvester.parse import parse_book
+from isbn_harvester.core.parse import parse_book
 
 
 def test_isbn_normalization_and_conversion() -> None:

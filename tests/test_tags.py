@@ -1,4 +1,4 @@
-from isbn_harvester.normalize import build_shopify_tags
+from isbn_harvester.core.normalize import build_shopify_tags
 
 
 def test_build_shopify_tags_basic() -> None:
