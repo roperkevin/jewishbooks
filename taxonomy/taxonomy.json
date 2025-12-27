@@ -24,7 +24,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -50,7 +51,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -76,7 +78,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -101,7 +104,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -124,7 +128,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -148,7 +153,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -173,7 +179,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -199,7 +206,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -219,7 +227,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -239,7 +248,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -262,7 +272,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -286,7 +297,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -307,7 +319,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -332,7 +345,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -350,7 +364,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -380,7 +395,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -407,7 +423,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -433,7 +450,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -469,7 +487,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -497,7 +516,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -523,7 +543,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -549,7 +570,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -576,7 +598,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     }
   ],
@@ -615,7 +638,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -638,7 +662,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -667,7 +692,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -690,7 +716,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -719,7 +746,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -741,7 +769,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -765,7 +794,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -790,7 +820,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -808,7 +839,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -827,7 +859,8 @@
       },
       "applies_to_fields": [
         "overview",
-        "synopsis"
+        "synopsis",
+        "title_long"
       ]
     },
     {
@@ -851,7 +884,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -872,7 +906,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -897,7 +932,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -920,7 +956,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -943,7 +980,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     }
   ],
@@ -967,7 +1005,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -997,7 +1036,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1022,7 +1062,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1047,7 +1088,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1065,7 +1107,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1083,7 +1126,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1103,7 +1147,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1123,7 +1168,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1141,7 +1187,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1160,7 +1207,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1179,7 +1227,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1198,7 +1247,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     }
   ],
@@ -1224,7 +1274,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1244,7 +1295,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1261,7 +1313,8 @@
       },
       "applies_to_fields": [
         "overview",
-        "synopsis"
+        "synopsis",
+        "title_long"
       ]
     },
     {
@@ -1280,7 +1333,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1299,7 +1353,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1317,7 +1372,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1335,7 +1391,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1352,7 +1409,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1373,7 +1431,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1391,7 +1450,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     },
     {
@@ -1408,7 +1468,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     }
   ],
@@ -1436,7 +1497,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1453,7 +1515,8 @@
       "applies_to_fields": [
         "overview",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1472,7 +1535,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1491,7 +1555,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1511,7 +1576,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1533,7 +1599,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1553,7 +1620,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1575,7 +1643,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     }
   ],
@@ -1605,7 +1674,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1633,7 +1703,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1657,7 +1728,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1681,7 +1753,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1702,7 +1775,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1726,7 +1800,8 @@
         "overview",
         "subjects",
         "synopsis",
-        "title"
+        "title",
+        "title_long"
       ]
     },
     {
@@ -1749,7 +1824,8 @@
         "title",
         "overview",
         "synopsis",
-        "subjects"
+        "subjects",
+        "title_long"
       ]
     }
   ],
@@ -1767,7 +1843,8 @@
       },
       "applies_to_fields": [
         "overview",
-        "synopsis"
+        "synopsis",
+        "title_long"
       ]
     },
     {
@@ -1784,7 +1861,8 @@
       },
       "applies_to_fields": [
         "overview",
-        "synopsis"
+        "synopsis",
+        "title_long"
       ]
     }
   ],
@@ -1803,7 +1881,8 @@
       },
       "applies_to_fields": [
         "overview",
-        "synopsis"
+        "synopsis",
+        "title_long"
       ]
     },
     {
@@ -1819,7 +1898,8 @@
       },
       "applies_to_fields": [
         "overview",
-        "synopsis"
+        "synopsis",
+        "title_long"
       ]
     },
     {
@@ -1835,7 +1915,8 @@
       },
       "applies_to_fields": [
         "overview",
-        "synopsis"
+        "synopsis",
+        "title_long"
       ]
     },
     {
@@ -1853,7 +1934,8 @@
       },
       "applies_to_fields": [
         "overview",
-        "synopsis"
+        "synopsis",
+        "title_long"
       ]
     }
   ]
