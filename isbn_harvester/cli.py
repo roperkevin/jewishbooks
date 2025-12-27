@@ -1,4 +1,4 @@
-# isbn_harvester/cli.py
+    # isbn_harvester/cli.py
 from __future__ import annotations
 
 import argparse
@@ -136,11 +136,12 @@ def main(argv: Optional[List[str]] = None) -> None:
     api_key = (os.getenv("ISBNDB_API_KEY") or "").strip()
     if not api_key:
         raise SystemExit("Missing ISBNDB_API_KEY (set in .env or environment).")
+    auth_header = (os.getenv("ISBNDB_AUTH_HEADER") or "authorization").strip().lower()
 
     affiliate_id = (os.getenv("BOOKSHOP_AFFILIATE_ID") or "").strip() or None
     langs = _split_langs(args.langs)
 
-    sess = make_isbndb_session(api_key)
+    sess = make_isbndb_session(api_key, auth_header=auth_header)
     task_groups = _split_langs(args.task_groups)
     tasks = build_tasks(
         fiction_only=args.fiction_only,
@@ -149,7 +150,13 @@ def main(argv: Optional[List[str]] = None) -> None:
         tasks_file=args.tasks_file,
     )
 
-    logger.info("Tasks: %s | fiction_only=%s | langs=%s", len(tasks), args.fiction_only, langs or ["(none)"])
+    logger.info(
+        "Tasks: %s | fiction_only=%s | langs=%s | auth_header=%s",
+        len(tasks),
+        args.fiction_only,
+        langs or ["(none)"],
+        auth_header,
+    )
     logger.info("Output(full): %s", args.out)
     if args.shopify_out:
         logger.info("Output(shopify): %s (publish=%s)", args.shopify_out, args.shopify_publish)
