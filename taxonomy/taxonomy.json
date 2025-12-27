@@ -382,6 +382,202 @@
         "synopsis",
         "subjects"
       ]
+    },
+    {
+      "id": "jewish_history_scholarship",
+      "label": "Jewish History & Scholarship",
+      "high_level_category": "Genre & Form",
+      "weight": 2.8,
+      "signals": {
+        "keywords": [
+          "history",
+          "historical",
+          "historiography",
+          "archives",
+          "chronicles"
+        ],
+        "phrases": [
+          "jewish history",
+          "history of the jews",
+          "history of israel",
+          "jewish studies"
+        ]
+      },
+      "applies_to_fields": [
+        "title",
+        "overview",
+        "synopsis",
+        "subjects"
+      ]
+    },
+    {
+      "id": "jewish_biography_memoir",
+      "label": "Jewish Biography & Memoir",
+      "high_level_category": "Genre & Form",
+      "weight": 2.8,
+      "signals": {
+        "keywords": [
+          "biography",
+          "autobiography",
+          "memoir",
+          "diary",
+          "letters"
+        ],
+        "phrases": [
+          "life of",
+          "biography of",
+          "memoir of"
+        ]
+      },
+      "applies_to_fields": [
+        "title",
+        "overview",
+        "synopsis",
+        "subjects"
+      ]
+    },
+    {
+      "id": "jewish_religion_practice",
+      "label": "Jewish Religion & Practice",
+      "high_level_category": "Genre & Form",
+      "weight": 3.0,
+      "signals": {
+        "keywords": [
+          "judaism",
+          "torah",
+          "talmud",
+          "halacha",
+          "midrash",
+          "rabbi",
+          "synagogue",
+          "shabbat",
+          "kabbalah",
+          "siddur",
+          "prayer",
+          "mitzvah",
+          "mitzvot",
+          "kosher"
+        ],
+        "phrases": [
+          "jewish law",
+          "religious practice",
+          "jewish prayer",
+          "jewish rituals"
+        ]
+      },
+      "applies_to_fields": [
+        "title",
+        "overview",
+        "synopsis",
+        "subjects"
+      ]
+    },
+    {
+      "id": "israel_zionism",
+      "label": "Israel & Zionism",
+      "high_level_category": "Genre & Form",
+      "weight": 2.8,
+      "signals": {
+        "keywords": [
+          "israel",
+          "zionism",
+          "zionist",
+          "jerusalem",
+          "knesset",
+          "idf",
+          "palestine"
+        ],
+        "phrases": [
+          "state of israel",
+          "modern israel",
+          "israeli politics"
+        ]
+      },
+      "applies_to_fields": [
+        "title",
+        "overview",
+        "synopsis",
+        "subjects"
+      ]
+    },
+    {
+      "id": "hebrew_yiddish_language",
+      "label": "Hebrew & Yiddish Language",
+      "high_level_category": "Genre & Form",
+      "weight": 2.6,
+      "signals": {
+        "keywords": [
+          "hebrew",
+          "yiddish",
+          "linguistics",
+          "grammar"
+        ],
+        "phrases": [
+          "hebrew language",
+          "yiddish language",
+          "hebrew literature",
+          "yiddish literature"
+        ]
+      },
+      "applies_to_fields": [
+        "title",
+        "overview",
+        "synopsis",
+        "subjects"
+      ]
+    },
+    {
+      "id": "jewish_philosophy_thought",
+      "label": "Jewish Philosophy & Thought",
+      "high_level_category": "Genre & Form",
+      "weight": 2.6,
+      "signals": {
+        "keywords": [
+          "philosophy",
+          "theology",
+          "ethics",
+          "mysticism",
+          "thought"
+        ],
+        "phrases": [
+          "jewish philosophy",
+          "religious philosophy",
+          "ethical thought"
+        ]
+      },
+      "applies_to_fields": [
+        "title",
+        "overview",
+        "synopsis",
+        "subjects"
+      ]
+    },
+    {
+      "id": "holocaust_history_memoir",
+      "label": "Holocaust History & Memoir",
+      "high_level_category": "Genre & Form",
+      "weight": 3.2,
+      "signals": {
+        "keywords": [
+          "holocaust",
+          "shoah",
+          "survivor",
+          "testimony",
+          "ghetto"
+        ],
+        "phrases": [
+          "holocaust memoir",
+          "survivor testimony",
+          "concentration camp",
+          "concentration camps"
+        ]
+      },
+      "applies_to_fields": [
+        "title",
+        "overview",
+        "synopsis",
+        "subjects"
+      ]
     }
   ],
   "jewish_themes": [
