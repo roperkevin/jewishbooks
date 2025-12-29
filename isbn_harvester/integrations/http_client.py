@@ -209,7 +209,15 @@ def isbndb_get(session: requests.Session, url: str, *, params: dict, timeout_s: 
             raise ISBNdbError(f"Request failed: {url} params={params} error={e}") from e
 
 
-def build_task_request(endpoint: str, query: str, page: int, page_size: int, lang: Optional[str]) -> Tuple[str, Dict[str, str]]:
+def build_task_request(
+    endpoint: str,
+    query: str,
+    page: int,
+    page_size: int,
+    lang: Optional[str],
+    *,
+    search_mode: str = "query",
+) -> Tuple[str, Dict[str, str]]:
     """
     Build request for harvesting.
 
@@ -223,8 +231,11 @@ def build_task_request(endpoint: str, query: str, page: int, page_size: int, lan
         params["language"] = lang
 
     if endpoint == "search":
-        params["q"] = query
-        return f"{ISBNDB_BASE_URL}/books", params
+        if (search_mode or "").lower() == "param":
+            params["q"] = query
+            return f"{ISBNDB_BASE_URL}/books", params
+        params["shouldMatchAll"] = "0"
+        return f"{ISBNDB_BASE_URL}/books/{q}", params
     if endpoint in ("publisher", "subject"):
         return f"{ISBNDB_BASE_URL}/{endpoint}/{q}", params
     return f"{ISBNDB_BASE_URL}/books/{q}", params

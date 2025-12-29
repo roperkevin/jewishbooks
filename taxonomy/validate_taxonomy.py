@@ -15,6 +15,8 @@ ALLOWED_FIELDS = {
     "overview",
     "synopsis",
     "subjects",
+    "ol_subjects",
+    "loc_subjects",
     "publisher",
 }
 
@@ -81,6 +83,8 @@ def validate(path: Path) -> int:
     warnings = []
     ids = set()
     for axis, nodes in data.items():
+        if axis == "meta":
+            continue
         if not isinstance(nodes, list):
             errors.append(f"{axis} must be a list")
             continue

@@ -35,11 +35,14 @@ def main() -> None:
     rows = apply_taxonomy(rows, args.taxonomy)
 
     counters = {
+        "content_type": Counter(),
         "primary_genre": Counter(),
         "jewish_themes": Counter(),
         "geography": Counter(),
         "historical_era": Counter(),
         "religious_orientation": Counter(),
+        "cultural_tradition": Counter(),
+        "language": Counter(),
         "character_focus": Counter(),
         "narrative_style": Counter(),
         "emotional_tone": Counter(),
@@ -47,6 +50,8 @@ def main() -> None:
     }
 
     for r in rows:
+        if r.taxonomy_content_type:
+            counters["content_type"][r.taxonomy_content_type] += 1
         if r.taxonomy_primary_genre:
             counters["primary_genre"][r.taxonomy_primary_genre] += 1
         for key, field in [
@@ -54,6 +59,8 @@ def main() -> None:
             ("geography", r.taxonomy_geography),
             ("historical_era", r.taxonomy_historical_era),
             ("religious_orientation", r.taxonomy_religious_orientation),
+            ("cultural_tradition", r.taxonomy_cultural_tradition),
+            ("language", r.taxonomy_language),
             ("character_focus", r.taxonomy_character_focus),
             ("narrative_style", r.taxonomy_narrative_style),
             ("emotional_tone", r.taxonomy_emotional_tone),

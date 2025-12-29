@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 from typing import List, Optional
 
 from isbn_harvester.enrich.taxonomy_assign import apply_taxonomy
+from isbn_harvester.enrich.external_enrich import enrich_rows
 from isbn_harvester.enrich.verify import verify_rows
 from isbn_harvester.integrations.covers import CoverUploader
 from isbn_harvester.integrations.http_client import TokenBucket, make_isbndb_session
@@ -18,6 +20,7 @@ from isbn_harvester.io.dashboard import write_dashboard
 from isbn_harvester.io.export_full import read_full_csv, write_full_csv
 from isbn_harvester.io.export_shopify import write_shopify_products_csv
 from isbn_harvester.io.report import write_report
+from isbn_harvester.io.utils import atomic_write_text
 from .config import load_dotenv
 
 
@@ -60,6 +63,25 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--taxonomy", default="taxonomy/taxonomy.json", help="Taxonomy JSON path")
     ap.add_argument("--taxonomy-debug", default=None, help="Write taxonomy debug JSONL")
     ap.add_argument("--taxonomy-review", default=None, help="Write taxonomy review queue JSONL")
+    ap.add_argument("--taxonomy-no-debug", action="store_true", help="Skip taxonomy debug/review outputs")
+    ap.add_argument("--taxonomy-snapshot-every", type=int, default=0, help="Write taxonomy snapshots every N seconds")
+    ap.add_argument("--taxonomy-snapshot-dir", default=None, help="Directory for taxonomy snapshots")
+    ap.add_argument("--external-enrich", action="store_true", help="Enrich with OpenLibrary/Google Books/LOC before taxonomy")
+    ap.add_argument("--external-enrich-all", action="store_true", help="Enrich all rows (not just sparse rows)")
+    ap.add_argument("--external-enrich-max", type=int, default=0, help="Max rows to enrich (0 = all)")
+    ap.add_argument("--external-enrich-concurrency", type=int, default=6, help="Parallel workers for enrichment")
+    ap.add_argument("--external-enrich-timeout", type=int, default=12, help="Timeout for enrichment requests")
+    ap.add_argument("--external-enrich-rate", type=float, default=2.0, help="Rate per sec for enrichment requests")
+    ap.add_argument("--external-enrich-burst", type=int, default=4, help="Burst for enrichment requests")
+    ap.add_argument("--external-enrich-cache", default=None, help="Optional JSONL cache path for enrichment payloads")
+    ap.add_argument("--external-enrich-no-openlibrary", action="store_true", help="Disable OpenLibrary enrichment")
+    ap.add_argument("--external-enrich-no-google", action="store_true", help="Disable Google Books enrichment")
+    ap.add_argument("--external-enrich-no-loc", action="store_true", help="Disable LOC enrichment")
+    ap.add_argument("--external-enrich-no-shortcircuit", action="store_true", help="Disable early exit when enough data is found")
+    ap.add_argument("--external-enrich-debug", action="store_true", help="Verbose per-ISBN enrichment logging")
+    ap.add_argument("--external-enrich-no-ol-fallback", action="store_true", help="Disable OpenLibrary title/author fallback search")
+    ap.add_argument("--external-enrich-loc-disable-after", type=int, default=3, help="Disable LOC after N rate limits")
+    ap.add_argument("--external-enrich-no-google-fallback", action="store_true", help="Disable Google Books title/author fallback search")
     ap.add_argument("--verify", action="store_true", help="Verify cover URLs and prune dead links")
     ap.add_argument("--verify-timeout", type=int, default=10, help="Timeout for cover verification calls")
     ap.add_argument("--verify-concurrency", type=int, default=6, help="Parallel workers for verification")
@@ -87,10 +109,14 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--tasks-file", default=None, help="YAML task config override (publishers, subjects, queries)")
     ap.add_argument("--dry-run", action="store_true", help="Fetch 1 page per task for a quick smoke run")
     ap.add_argument("--no-bookshop", action="store_true", help="Disable Bookshop URLs in output")
+    ap.add_argument("--search-mode", default="query", help="Search mode: query (default) or param")
+    ap.add_argument("--safe-defaults", action="store_true", help="Use conservative concurrency/rate defaults")
 
     ap.add_argument("--shuffle-tasks", action="store_true", help="Shuffle tasks for better coverage sooner")
     ap.add_argument("--start-index-jitter", type=int, default=0, help="Randomly start at later pages (spreads load)")
     ap.add_argument("--snapshot-every", type=int, default=45, help="Write partial CSV every N seconds (0 disables)")
+    ap.add_argument("--snapshot-dir", default=None, help="Optional directory for timestamped snapshots")
+    ap.add_argument("--run-summary", default=None, help="Write a JSON summary of the harvest run")
     ap.add_argument("--fiction-only", action="store_true", help="Bias toward fiction titles")
 
     # Graceful stop controls
@@ -112,6 +138,17 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--log-level", default="info", help="Log level: debug, info, warning, error")
 
     args = ap.parse_args(argv)
+
+    if args.safe_defaults:
+        args.concurrency = min(args.concurrency, 2)
+        args.rate_per_sec = min(args.rate_per_sec, 1.0)
+        args.burst = min(args.burst, 2)
+        args.covers_concurrency = min(args.covers_concurrency, 2)
+        args.covers_rate_per_sec = min(args.covers_rate_per_sec, 1.0)
+        args.covers_burst = min(args.covers_burst, 2)
+        args.external_enrich_concurrency = min(args.external_enrich_concurrency, 2)
+        args.external_enrich_rate = min(args.external_enrich_rate, 1.0)
+        args.external_enrich_burst = min(args.external_enrich_burst, 2)
 
     level = LOG_LEVELS.get(args.log_level.lower(), logging.INFO)
     if RichHandler:
@@ -157,6 +194,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         langs or ["(none)"],
         auth_header,
     )
+    logger.info("Search mode: %s", args.search_mode)
     logger.info("Output(full): %s", args.out)
     if args.shopify_out:
         logger.info("Output(shopify): %s (publish=%s)", args.shopify_out, args.shopify_publish)
@@ -172,6 +210,15 @@ def main(argv: Optional[List[str]] = None) -> None:
         logger.info("Profile: %s", args.profile)
     if args.taxonomy:
         logger.info("Taxonomy: %s", args.taxonomy)
+    if args.external_enrich:
+        logger.info(
+            "External enrich: enabled (max=%s, concurrency=%s, timeout=%s)",
+            args.external_enrich_max or "all",
+            args.external_enrich_concurrency,
+            args.external_enrich_timeout,
+        )
+        if args.external_enrich_cache:
+            logger.info("External enrich cache: %s", args.external_enrich_cache)
     if args.checkpoint:
         logger.info("Checkpoint: %s (resume=%s)", args.checkpoint, args.resume)
     if args.stop_file:
@@ -213,6 +260,8 @@ def main(argv: Optional[List[str]] = None) -> None:
             shuffle_tasks=args.shuffle_tasks,
             start_index_jitter=args.start_index_jitter,
             snapshot_every_s=args.snapshot_every,
+            snapshot_dir=args.snapshot_dir,
+            run_summary_path=args.run_summary,
             fiction_only=args.fiction_only,
             bookshop_affiliate_id=affiliate_id,
             bookshop_enabled=not args.no_bookshop,
@@ -221,6 +270,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             dry_run=args.dry_run,
             profiler=profiler,
             verbose_task_errors=True,
+            search_mode=args.search_mode,
         )
 
     # Convert to RowStore (covers.py expects RowStore)
@@ -230,16 +280,62 @@ def main(argv: Optional[List[str]] = None) -> None:
         rows_by_isbn13 = {r.isbn13: r for r in rows if r.isbn13}
     store = RowStore(rows_by_isbn13)
 
+    if args.external_enrich:
+        google_key = (os.getenv("GOOGLE_BOOKS_API_KEY") or "").strip() or None
+        if not google_key:
+            logger.info("External enrich: GOOGLE_BOOKS_API_KEY not set; skipping Google Books.")
+        rows = store.snapshot_values()
+        cache_stats = {}
+        enriched = enrich_rows(
+            rows,
+            google_api_key=google_key,
+            enable_openlibrary=not args.external_enrich_no_openlibrary,
+            enable_google_books=not args.external_enrich_no_google,
+            enable_loc=not args.external_enrich_no_loc,
+            max_rows=args.external_enrich_max,
+            concurrency=args.external_enrich_concurrency,
+            timeout_s=args.external_enrich_timeout,
+            rate_per_sec=args.external_enrich_rate,
+            burst=args.external_enrich_burst,
+            enrich_all=args.external_enrich_all,
+            cache_path=args.external_enrich_cache,
+            cache_stats=cache_stats,
+            shortcircuit=not args.external_enrich_no_shortcircuit,
+            debug=args.external_enrich_debug,
+            openlibrary_fallback=not args.external_enrich_no_ol_fallback,
+            loc_disable_after=args.external_enrich_loc_disable_after,
+            google_fallback=not args.external_enrich_no_google_fallback,
+            fiction_only=args.fiction_only,
+        )
+        store = RowStore({r.isbn13: r for r in enriched if r.isbn13})
+        if args.run_summary and cache_stats:
+            try:
+                with open(args.run_summary, "r", encoding="utf-8") as f:
+                    summary = json.load(f)
+                summary["external_enrich_cache"] = cache_stats
+
+                def _write(path: str) -> None:
+                    with open(path, "w", encoding="utf-8") as f:
+                        json.dump(summary, f, indent=2, sort_keys=True)
+
+                atomic_write_text(_write, args.run_summary)
+            except Exception as e:
+                logger.warning("Failed to update run summary with cache stats: %r", e)
+
     if args.taxonomy:
         tax_path = args.taxonomy
         if not os.path.exists(tax_path):
             raise SystemExit(f"Taxonomy file not found: {tax_path}")
         rows = store.snapshot_values()
+        review_path = None if args.taxonomy_no_debug else args.taxonomy_review
+        debug_path = None if args.taxonomy_no_debug else args.taxonomy_debug
         tax_rows = apply_taxonomy(
             rows,
             tax_path,
-            review_queue_path=args.taxonomy_review,
-            debug_path=args.taxonomy_debug,
+            review_queue_path=review_path,
+            debug_path=debug_path,
+            snapshot_every_s=args.taxonomy_snapshot_every,
+            snapshot_dir=args.taxonomy_snapshot_dir,
         )
         store = RowStore({r.isbn13: r for r in tax_rows})
 
@@ -297,6 +393,10 @@ def main(argv: Optional[List[str]] = None) -> None:
 
         if not s3_bucket:
             raise SystemExit("Covers enabled but S3_BUCKET is not set.")
+        if cloudfront_domain:
+            bad = cloudfront_domain.startswith("http://") or cloudfront_domain.startswith("https://")
+            if bad:
+                raise SystemExit("CLOUDFRONT_DOMAIN should be a domain only (no https://).")
 
         logger.info(
             "S3_BUCKET=%s | AWS_REGION=%s | CLOUDFRONT_DOMAIN=%s",

@@ -16,7 +16,7 @@ import requests
 from isbn_harvester.core.checkpoint import CheckpointWriter, read_completed_covers
 from isbn_harvester.core.models import BookRow
 from isbn_harvester.core.store import RowStore
-from isbn_harvester.integrations.http_client import ISBNDB_BASE_URL, TokenBucket, isbndb_get
+from isbn_harvester.integrations.http_client import ISBNDB_BASE_URL, TokenBucket, isbndb_get, clone_isbndb_session
 
 logger = logging.getLogger(__name__)
 try:
@@ -50,12 +50,23 @@ def guess_ext_from_url(url: str) -> str:
     return "jpg"
 
 
-def fetch_image_bytes(session: requests.Session, url: str, *, timeout_s: int, retries: int) -> Tuple[bytes, str]:
+def fetch_image_bytes(
+    session: requests.Session,
+    url: str,
+    *,
+    timeout_s: int,
+    retries: int,
+    max_bytes: int = 10 * 1024 * 1024,
+) -> Tuple[bytes, str]:
     backoff = 1.0
     for attempt in range(1, retries + 2):
         try:
             logger.debug("GET image %s attempt=%s/%s", url, attempt, retries + 1)
             r = session.get(url, timeout=timeout_s, stream=True)
+            content_len = r.headers.get("Content-Length")
+            if content_len and content_len.isdigit():
+                if int(content_len) > max_bytes:
+                    raise RuntimeError(f"Image too large ({content_len} bytes)")
             if r.status_code in (429, 500, 502, 503, 504):
                 if attempt <= retries:
                     time.sleep(min(30.0, backoff))
@@ -68,6 +79,8 @@ def fetch_image_bytes(session: requests.Session, url: str, *, timeout_s: int, re
 
             if not content_type.startswith("image/"):
                 raise RuntimeError(f"Non-image content-type: {content_type}")
+            if len(body) > max_bytes:
+                raise RuntimeError(f"Image too large ({len(body)} bytes)")
             if len(body) < 2048:
                 raise RuntimeError(f"Image too small ({len(body)} bytes)")
 
@@ -213,6 +226,7 @@ class CoverUploader:
 
         def cover_worker() -> None:
             img_sess = requests.Session()
+            isbndb_sess = clone_isbndb_session(self.isbndb_session)
 
             while True:
                 if self.should_stop():
@@ -256,7 +270,7 @@ class CoverUploader:
                     if not cover and not cover_orig:
                         self.rate_limiter.take(1.0)
                         detail = isbndb_fetch_book_detail(
-                            self.isbndb_session,
+                            isbndb_sess,
                             isbn13,
                             timeout_s=self.timeout_s,
                             retries=self.retries,

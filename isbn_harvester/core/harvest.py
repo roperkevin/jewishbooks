@@ -28,8 +28,45 @@ from isbn_harvester.integrations.http_client import (
 )
 from isbn_harvester.integrations.profiler import RequestProfiler
 from isbn_harvester.io.export_full import write_full_csv
+from isbn_harvester.io.utils import atomic_write_text
 
 logger = logging.getLogger(__name__)
+
+RUN_SUMMARY_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ISBN Harvester Run Summary",
+    "type": "object",
+    "required": [
+        "started_at",
+        "finished_at",
+        "duration_s",
+        "unique13",
+        "stats",
+        "requests_by_endpoint",
+        "errors_by_endpoint",
+        "stop_reason",
+    ],
+    "properties": {
+        "started_at": {"type": "integer"},
+        "finished_at": {"type": "integer"},
+        "duration_s": {"type": "number"},
+        "unique13": {"type": "integer"},
+        "stats": {"type": "object"},
+        "requests_by_endpoint": {"type": "object"},
+        "errors_by_endpoint": {"type": "object"},
+        "stop_reason": {"type": "string"},
+        "external_enrich_cache": {
+            "type": "object",
+            "properties": {
+                "hits": {"type": "integer"},
+                "misses": {"type": "integer"},
+                "writes": {"type": "integer"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    "additionalProperties": False,
+}
 
 
 # -----------------------------
@@ -92,12 +129,22 @@ def merge_row(existing: BookRow, new: BookRow, fiction_only: bool) -> BookRow:
     taxonomy_geography = pick.taxonomy_geography or existing.taxonomy_geography
     taxonomy_historical_era = pick.taxonomy_historical_era or existing.taxonomy_historical_era
     taxonomy_religious_orientation = pick.taxonomy_religious_orientation or existing.taxonomy_religious_orientation
+    taxonomy_cultural_tradition = pick.taxonomy_cultural_tradition or existing.taxonomy_cultural_tradition
+    taxonomy_language = pick.taxonomy_language or existing.taxonomy_language
     taxonomy_character_focus = pick.taxonomy_character_focus or existing.taxonomy_character_focus
     taxonomy_narrative_style = pick.taxonomy_narrative_style or existing.taxonomy_narrative_style
     taxonomy_emotional_tone = pick.taxonomy_emotional_tone or existing.taxonomy_emotional_tone
     taxonomy_high_level_categories = pick.taxonomy_high_level_categories or existing.taxonomy_high_level_categories
     taxonomy_confidence = pick.taxonomy_confidence or existing.taxonomy_confidence
     taxonomy_tags = pick.taxonomy_tags or existing.taxonomy_tags
+    taxonomy_content_type = pick.taxonomy_content_type or existing.taxonomy_content_type
+
+    if pick.google_ratings_count >= existing.google_ratings_count:
+        google_average_rating = pick.google_average_rating
+        google_ratings_count = pick.google_ratings_count
+    else:
+        google_average_rating = existing.google_average_rating
+        google_ratings_count = existing.google_ratings_count
 
     cover_url = pick.cover_url or existing.cover_url
     cover_url_original = pick.cover_url_original or existing.cover_url_original
@@ -134,6 +181,8 @@ def merge_row(existing: BookRow, new: BookRow, fiction_only: bool) -> BookRow:
         publisher=pick.publisher,
         language=pick.language,
         subjects=pick.subjects,
+        ol_subjects=pick.ol_subjects or existing.ol_subjects,
+        loc_subjects=pick.loc_subjects or existing.loc_subjects,
         pages=pick.pages,
         format=pick.format,
         synopsis=pick.synopsis,
@@ -153,17 +202,24 @@ def merge_row(existing: BookRow, new: BookRow, fiction_only: bool) -> BookRow:
         seen_count=seen_count,
         sources=sources,
         shopify_tags=tags,
+        taxonomy_content_type=taxonomy_content_type,
         taxonomy_primary_genre=taxonomy_primary_genre,
         taxonomy_jewish_themes=taxonomy_jewish_themes,
         taxonomy_geography=taxonomy_geography,
         taxonomy_historical_era=taxonomy_historical_era,
         taxonomy_religious_orientation=taxonomy_religious_orientation,
+        taxonomy_cultural_tradition=taxonomy_cultural_tradition,
+        taxonomy_language=taxonomy_language,
         taxonomy_character_focus=taxonomy_character_focus,
         taxonomy_narrative_style=taxonomy_narrative_style,
         taxonomy_emotional_tone=taxonomy_emotional_tone,
         taxonomy_high_level_categories=taxonomy_high_level_categories,
         taxonomy_confidence=taxonomy_confidence,
         taxonomy_tags=taxonomy_tags,
+        google_main_category=pick.google_main_category or existing.google_main_category,
+        google_categories=pick.google_categories or existing.google_categories,
+        google_average_rating=google_average_rating,
+        google_ratings_count=google_ratings_count,
         task_endpoint=pick.task_endpoint,
         task_query=pick.task_query,
         task_group=pick.task_group,
@@ -197,10 +253,13 @@ class Harvester:
         shuffle_tasks: bool,
         start_index_jitter: int,
         snapshot_every_s: int,
+        snapshot_dir: Optional[str],
+        run_summary_path: Optional[str],
         fiction_only: bool,
         bookshop_affiliate_id: Optional[str],
         bookshop_enabled: bool = True,
         profiler: Optional[RequestProfiler] = None,
+        search_mode: str = "query",
         stop_file: Optional[str],
         max_seconds: int,
         dry_run: bool = False,
@@ -224,10 +283,13 @@ class Harvester:
         self.shuffle_tasks = shuffle_tasks
         self.start_index_jitter = start_index_jitter
         self.snapshot_every_s = snapshot_every_s
+        self.snapshot_dir = snapshot_dir
+        self.run_summary_path = run_summary_path
         self.fiction_only = fiction_only
         self.bookshop_affiliate_id = bookshop_affiliate_id
         self.bookshop_enabled = bookshop_enabled
         self.profiler = profiler
+        self.search_mode = (search_mode or "query").lower()
 
         self.stop_file = stop_file
         self.max_seconds = max_seconds
@@ -242,10 +304,18 @@ class Harvester:
 
         self.quota_stop = threading.Event()
 
+        self._counts_lock = threading.Lock()
+        self._req_counts: Dict[str, int] = {}
+        self._err_counts: Dict[str, int] = {}
+
         if checkpoint_path:
             os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
         if raw_jsonl:
             os.makedirs(os.path.dirname(raw_jsonl) or ".", exist_ok=True)
+        if snapshot_dir:
+            os.makedirs(snapshot_dir, exist_ok=True)
+        if run_summary_path:
+            os.makedirs(os.path.dirname(run_summary_path) or ".", exist_ok=True)
 
         self.ck = CheckpointWriter(checkpoint_path)
 
@@ -253,6 +323,60 @@ class Harvester:
         self.raw_fh = open(raw_jsonl, "a", encoding="utf-8") if raw_jsonl else None
 
         self.start_ts = time.time()
+
+    def _count_req(self, endpoint: str, n: int = 1) -> None:
+        with self._counts_lock:
+            self._req_counts[endpoint] = self._req_counts.get(endpoint, 0) + int(n)
+
+    def _count_err(self, endpoint: str, n: int = 1) -> None:
+        with self._counts_lock:
+            self._err_counts[endpoint] = self._err_counts.get(endpoint, 0) + int(n)
+
+    def _log_summaries(self) -> None:
+        if self._req_counts:
+            logger.info("Request summary by endpoint: %s", self._req_counts)
+        if self._err_counts:
+            logger.info("Error summary by endpoint: %s", self._err_counts)
+
+    def _stop_reason(self) -> str:
+        if self.quota_stop.is_set():
+            return "quota_exhausted"
+        if self.max_seconds > 0 and (time.time() - self.start_ts) >= self.max_seconds:
+            return "max_seconds"
+        if self.stop_file:
+            try:
+                if os.path.exists(self.stop_file):
+                    return "stop_file"
+            except Exception:
+                pass
+        return ""
+
+    def _write_run_summary(self) -> None:
+        if not self.run_summary_path:
+            return
+        payload = {
+            "started_at": int(self.start_ts),
+            "finished_at": int(time.time()),
+            "duration_s": round(time.time() - self.start_ts, 3),
+            "unique13": self.store.size(),
+            "stats": self.stats.snapshot_dict(unique13=self.store.size()),
+            "requests_by_endpoint": self._req_counts,
+            "errors_by_endpoint": self._err_counts,
+            "stop_reason": self._stop_reason(),
+        }
+
+        def _write(path: str) -> None:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, sort_keys=True)
+
+        atomic_write_text(_write, self.run_summary_path)
+        schema_path = f"{self.run_summary_path}.schema.json"
+
+        def _write_schema(path: str) -> None:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(RUN_SUMMARY_SCHEMA, f, indent=2, sort_keys=True)
+
+        atomic_write_text(_write_schema, schema_path)
 
     def close(self) -> None:
         try:
@@ -292,6 +416,10 @@ class Harvester:
                     continue
                 last_n = len(rows)
                 write_full_csv(rows, self.out_path)
+                if self.snapshot_dir:
+                    ts = time.strftime("%Y%m%d_%H%M%S", time.gmtime())
+                    snap_path = os.path.join(self.snapshot_dir, f"snapshot_{ts}.csv")
+                    write_full_csv(rows, snap_path)
             except Exception:
                 # Snapshot is best-effort
                 continue
@@ -362,6 +490,7 @@ class Harvester:
                                 page=page,
                                 page_size=self.page_size,
                                 lang=lang,
+                                search_mode=self.search_mode,
                             )
 
                             try:
@@ -373,9 +502,11 @@ class Harvester:
                                     timeout_s=self.timeout_s,
                                     retries=self.retries,
                                 )
+                                self._count_req(t.endpoint, 1)
                                 if self.profiler:
                                     self.profiler.record(t.endpoint, time.time() - req_start, ok=True)
                             except ISBNdbQuotaError as qe:
+                                self._count_err(t.endpoint, 1)
                                 self.quota_stop.set()
                                 self.ck_write(
                                     {
@@ -394,6 +525,7 @@ class Harvester:
                                 logger.error("Quota exhausted during %s:%s page=%s", t.endpoint, t.query, page)
                                 raise
                             except ISBNdbError as e:
+                                self._count_err(t.endpoint, 1)
                                 if self.profiler:
                                     self.profiler.record(t.endpoint, time.time() - req_start, ok=False)
                                 msg = str(e)
@@ -405,6 +537,7 @@ class Harvester:
                                         page=page,
                                         page_size=self.page_size,
                                         lang=lang,
+                                        search_mode=self.search_mode,
                                     )
                                     self.ck_write(
                                         {
@@ -426,11 +559,13 @@ class Harvester:
                                         timeout_s=self.timeout_s,
                                         retries=self.retries,
                                     )
+                                    self._count_req("search_fallback", 1)
                                     if self.profiler:
                                         self.profiler.record("search_fallback", time.time() - req_start, ok=True)
                                 else:
                                     raise
                             except Exception:
+                                self._count_err(t.endpoint, 1)
                                 if self.profiler:
                                     self.profiler.record(t.endpoint, time.time() - req_start, ok=False)
                                 raise
@@ -470,8 +605,10 @@ class Harvester:
                                     f["date_published"],
                                     f["language"],
                                     bool(f["synopsis"]),
+                                    None,
+                                    None,
                                 )
-                                matched_terms = ", ".join(matched)
+                                matched_terms = ", ".join([m for m in matched if not m.startswith("contains:")])
                                 tags = build_shopify_tags(f["subjects"], matched_terms, f["publisher"])
 
                                 if self.bookshop_enabled:
@@ -500,6 +637,8 @@ class Harvester:
                                     publisher=f["publisher"],
                                     language=f["language"],
                                     subjects=f["subjects"],
+                                    ol_subjects="",
+                                    loc_subjects="",
                                     pages=f["pages"],
                                     format=f["format"],
                                     synopsis=f["synopsis"],
@@ -519,17 +658,24 @@ class Harvester:
                                     seen_count=1,
                                     sources=t.query[:200],
                                     shopify_tags=tags,
+                                    taxonomy_content_type="",
                                     taxonomy_primary_genre="",
                                     taxonomy_jewish_themes="",
                                     taxonomy_geography="",
                                     taxonomy_historical_era="",
                                     taxonomy_religious_orientation="",
+                                    taxonomy_cultural_tradition="",
+                                    taxonomy_language="",
                                     taxonomy_character_focus="",
                                     taxonomy_narrative_style="",
                                     taxonomy_emotional_tone="",
                                     taxonomy_high_level_categories="",
                                     taxonomy_confidence="",
                                     taxonomy_tags="",
+                                    google_main_category="",
+                                    google_categories="",
+                                    google_average_rating=0.0,
+                                    google_ratings_count=0,
                                     task_endpoint=t.endpoint,
                                     task_query=t.query,
                                     task_group=t.group,
@@ -649,6 +795,8 @@ class Harvester:
                 th.join(timeout=1.0)
             print()
             logger.info("Harvest complete: unique13=%s", self.store.size())
+            self._log_summaries()
+            self._write_run_summary()
         finally:
             stop_snap.set()
             if snap_thread:
@@ -684,10 +832,13 @@ def harvest(
     shuffle_tasks: bool,
     start_index_jitter: int,
     snapshot_every_s: int,
+    snapshot_dir: Optional[str],
+    run_summary_path: Optional[str],
     fiction_only: bool,
     bookshop_affiliate_id: Optional[str],
     bookshop_enabled: bool = True,
     profiler: Optional[RequestProfiler] = None,
+    search_mode: str = "query",
     stop_file: Optional[str],
     max_seconds: int,
     dry_run: bool = False,
@@ -715,10 +866,13 @@ def harvest(
         shuffle_tasks=shuffle_tasks,
         start_index_jitter=start_index_jitter,
         snapshot_every_s=snapshot_every_s,
+        snapshot_dir=snapshot_dir,
+        run_summary_path=run_summary_path,
         fiction_only=fiction_only,
         bookshop_affiliate_id=bookshop_affiliate_id,
         bookshop_enabled=bookshop_enabled,
         profiler=profiler,
+        search_mode=search_mode,
         stop_file=stop_file,
         max_seconds=max_seconds,
         dry_run=dry_run,

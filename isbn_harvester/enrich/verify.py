@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import replace
 from typing import Iterable, List, Optional, Tuple
@@ -34,7 +35,16 @@ def _verify_one(row: BookRow, timeout_s: int) -> Tuple[BookRow, bool]:
     if not url:
         return row, True
     sess = requests.Session()
-    ok = _check_url(sess, url, timeout_s)
+    return _verify_one_with_session(row, url, sess, timeout_s)
+
+
+def _verify_one_with_session(
+    row: BookRow,
+    url: str,
+    session: requests.Session,
+    timeout_s: int,
+) -> Tuple[BookRow, bool]:
+    ok = _check_url(session, url, timeout_s)
     if ok:
         return row, True
     cleared = replace(
@@ -68,9 +78,21 @@ def verify_rows(
     verified: List[Optional[BookRow]] = [None] * verify_count
     failures = 0
 
+    local = threading.local()
+
+    def _verify_row(row: BookRow) -> Tuple[BookRow, bool]:
+        url = _choose_cover_url(row)
+        if not url:
+            return row, True
+        sess = getattr(local, "session", None)
+        if sess is None:
+            sess = requests.Session()
+            local.session = sess
+        return _verify_one_with_session(row, url, sess, timeout_s)
+
     with ThreadPoolExecutor(max_workers=max(1, concurrency)) as ex:
         future_map = {
-            ex.submit(_verify_one, row, timeout_s): i for i, row in enumerate(verify_rows_list)
+            ex.submit(_verify_row, row): i for i, row in enumerate(verify_rows_list)
         }
         for fut in as_completed(future_map):
             idx = future_map[fut]

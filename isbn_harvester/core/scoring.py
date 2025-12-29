@@ -52,10 +52,14 @@ _SYNONYM_REPLACEMENTS = {
     "shabbos": "shabbat",
 }
 
+_SYNONYM_PATTERNS = [
+    (re.compile(rf"\\b{re.escape(src)}\\b"), dst) for src, dst in _SYNONYM_REPLACEMENTS.items()
+]
+
 
 def _apply_synonyms(hay: str) -> str:
-    for src, dst in _SYNONYM_REPLACEMENTS.items():
-        hay = hay.replace(src, dst)
+    for pattern, dst in _SYNONYM_PATTERNS:
+        hay = pattern.sub(dst, hay)
     return hay
 
 
@@ -113,7 +117,14 @@ def fiction_flag(subjects: str, synopsis: str, title: str = "") -> int:
     return 1 if any(_term_in_hay(h, hay) for h in FICTION_HINTS) else 0
 
 
-def popularity_proxy(pages: str, date_published: str, language: str, has_synopsis: bool) -> float:
+def popularity_proxy(
+    pages: str,
+    date_published: str,
+    language: str,
+    has_synopsis: bool,
+    average_rating: float | None = None,
+    ratings_count: int | None = None,
+) -> float:
     p = 0.0
     try:
         n = int(re.sub(r"\D+", "", pages or "") or "0")
@@ -139,6 +150,17 @@ def popularity_proxy(pages: str, date_published: str, language: str, has_synopsi
         p += 0.15
     if has_synopsis:
         p += 0.15
+
+    if average_rating is not None and ratings_count is not None:
+        try:
+            rc = max(0, int(ratings_count))
+            ar = max(0.0, min(5.0, float(average_rating)))
+            if rc >= 5:
+                p += min(0.2, (ar / 5.0) * 0.2)
+            if rc >= 50:
+                p += 0.05
+        except Exception:
+            pass
 
     return max(0.0, min(1.0, p))
 

@@ -17,6 +17,8 @@ class BookRow:
     publisher: str
     language: str
     subjects: str
+    ol_subjects: str
+    loc_subjects: str
     pages: str
     format: str
     synopsis: str
@@ -40,17 +42,24 @@ class BookRow:
     seen_count: int
     sources: str
     shopify_tags: str
+    taxonomy_content_type: str
     taxonomy_primary_genre: str
     taxonomy_jewish_themes: str
     taxonomy_geography: str
     taxonomy_historical_era: str
     taxonomy_religious_orientation: str
+    taxonomy_cultural_tradition: str
+    taxonomy_language: str
     taxonomy_character_focus: str
     taxonomy_narrative_style: str
     taxonomy_emotional_tone: str
     taxonomy_high_level_categories: str
     taxonomy_confidence: str
     taxonomy_tags: str
+    google_main_category: str
+    google_categories: str
+    google_average_rating: float
+    google_ratings_count: int
 
     task_endpoint: str
     task_query: str

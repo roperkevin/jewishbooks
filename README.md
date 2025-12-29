@@ -29,11 +29,15 @@ Create a `.env` file in the project root with:
 
 ```
 ISBNDB_API_KEY=your_key
+ISBNDB_AUTH_HEADER=authorization
+GOOGLE_BOOKS_API_KEY=your_key_optional
 BOOKSHOP_AFFILIATE_ID=your_affiliate_id_optional
 S3_BUCKET=your_bucket_optional
 AWS_REGION=us-west-2
 CLOUDFRONT_DOMAIN=your_domain_optional
 ```
+
+Tip: keep `.env` out of version control.
 
 ## Quickstart
 
@@ -54,6 +58,20 @@ Dry run (1 page per task):
 ```
 python -m isbn_harvester --dry-run --task-limit 5
 ```
+
+Write timestamped snapshots while harvesting:
+
+```
+python -m isbn_harvester --snapshot-every 60 --snapshot-dir runs/snapshots
+```
+
+Write a JSON run summary:
+
+```
+python -m isbn_harvester --run-summary runs/summary.json
+```
+
+This also writes a JSON schema alongside it as `runs/summary.json.schema.json`.
 
 ## Covers
 
@@ -83,6 +101,11 @@ Run a quick smoke test with low rate limits:
 python -m isbn_harvester --dry-run --rate-per-sec 1 --burst 1 --concurrency 1
 ```
 
+Use conservative defaults:
+
+```
+python -m isbn_harvester --safe-defaults
+```
 Debug logging for request-level detail:
 
 ```
@@ -129,6 +152,18 @@ Generate Shopify CSV without Bookshop URLs:
 
 ```
 python -m isbn_harvester --no-bookshop --shopify-out jewish_books_shopify.csv
+```
+
+Validate a Shopify CSV:
+
+```
+python -m isbn_harvester.io.validate_shopify jewish_books_shopify.csv
+```
+
+Metafield definitions (Shopify Admin API):
+
+```
+cat shopify/metafields.json
 ```
 
 Verify cover URLs and prune dead links:
@@ -183,6 +218,48 @@ Run with taxonomy enabled:
 python -m isbn_harvester --taxonomy taxonomy/taxonomy.json --taxonomy-debug taxonomy_debug.jsonl --taxonomy-review taxonomy_review.jsonl
 ```
 
+Note: taxonomy v2 can use `ol_subjects` and `loc_subjects` when external enrichment is enabled.
+
+Skip taxonomy debug/review outputs for speed:
+
+```
+python -m isbn_harvester --taxonomy taxonomy/taxonomy.json --taxonomy-no-debug
+```
+
+Write taxonomy snapshots while classifying:
+
+```
+python -m isbn_harvester --taxonomy taxonomy/taxonomy.json --taxonomy-snapshot-every 60 --taxonomy-snapshot-dir runs/taxonomy_snaps
+```
+
+## External Enrichment
+
+Pull additional subjects/descriptions from OpenLibrary, Google Books, and the Library of Congress to improve taxonomy matches:
+
+```
+python -m isbn_harvester --external-enrich --taxonomy taxonomy/taxonomy.json
+```
+
+External enrichment overwrites empty fields for: title, subtitle, authors, publisher, date_published, language, pages, cover_url, cover_url_original, synopsis, overview (and merges subjects).
+Google Books adds: google_main_category and google_categories (stored as JSON array when available).
+
+Optional controls:
+- `--external-enrich-max 2000` (limit rows)
+- `--external-enrich-all` (enrich even if fields already present)
+- `--external-enrich-cache runs/enrich_cache.jsonl` (reuse cached payloads)
+- `--external-enrich-no-openlibrary` (skip OpenLibrary)
+- `--external-enrich-no-google` (skip Google Books)
+- `--external-enrich-no-loc` (skip Library of Congress)
+- `--external-enrich-no-shortcircuit` (disable early exit when enough data is found)
+- `--external-enrich-debug` (verbose per-ISBN enrichment logging)
+- `--external-enrich-no-ol-fallback` (disable OpenLibrary title/author fallback search)
+- `--external-enrich-loc-disable-after 3` (disable LOC after N rate limits)
+- `--external-enrich-no-google-fallback` (disable Google Books title/author fallback search)
+
+Search mode controls:
+- `--search-mode query` (default, uses `/books/{query}` for search)
+- `--search-mode param` (uses `/books?q=` if your plan supports it)
+
 Sample input and output:
 
 ```
@@ -220,6 +297,18 @@ assigned = {
 - Checkpoint: NDJSON events for resume/recovery (optional)
 
 ## CLI Reference
+
+To run linting on a Shopify CSV via Make:
+
+```
+make lint-shopify CSV=jewish_books_shopify.csv
+```
+
+Quick smoke run:
+
+```
+make smoke
+```
 
 ### Outputs
 
@@ -259,6 +348,7 @@ assigned = {
 | `--tasks-file` | `None` | YAML task config override |
 | `--dry-run` | `False` | Fetch 1 page per task for a quick smoke run |
 | `--no-bookshop` | `False` | Disable Bookshop URLs in output |
+| `--safe-defaults` | `False` | Use conservative concurrency/rate defaults |
 | `--log-level` | `info` | Log level: debug, info, warning, error |
 
 ### Graceful stop
@@ -309,6 +399,9 @@ assigned = {
 | `--taxonomy` | `taxonomy/taxonomy.json` | Taxonomy JSON path |
 | `--taxonomy-debug` | `None` | Write taxonomy debug JSONL |
 | `--taxonomy-review` | `None` | Write taxonomy review queue JSONL |
+| `--taxonomy-no-debug` | `False` | Skip taxonomy debug/review outputs |
+| `--taxonomy-snapshot-every` | `0` | Write taxonomy snapshots every N seconds |
+| `--taxonomy-snapshot-dir` | `None` | Directory for taxonomy snapshots |
 
 ## Troubleshooting
 

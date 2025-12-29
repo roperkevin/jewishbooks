@@ -8,7 +8,8 @@ ISBN10_RE = re.compile(r"^\d{9}[\dX]$")
 ISBN13_RE = re.compile(r"^\d{13}$")
 
 _TAG_SPLIT = re.compile(r"[;,/|]+")
-_TAG_CLEAN = re.compile(r"[^a-z0-9 _-]+")
+_TAG_CLEAN = re.compile(r"[^\w\s-]+")
+_SUBJECT_SPLIT = _TAG_SPLIT
 
 
 def normalize_isbn(x: str) -> str:
@@ -75,6 +76,41 @@ def _norm_tag(s: str) -> str:
     return s
 
 
+def _smart_title(s: str) -> str:
+    if not s:
+        return ""
+    if s.isupper() and len(s) <= 4:
+        return s
+    if any(ch.isdigit() for ch in s):
+        return s.upper() if s.isupper() else s
+    return s.title()
+
+
+def normalize_subject_term(s: str) -> str:
+    s = (s or "").strip()
+    if not s:
+        return ""
+    s = s.replace("_", " ")
+    s = re.sub(r"\s+", " ", s).strip()
+    return _smart_title(s)
+
+
+def normalize_subjects(subjects: str) -> str:
+    parts = [p.strip() for p in _SUBJECT_SPLIT.split(subjects or "") if p.strip()]
+    seen = set()
+    out: List[str] = []
+    for p in parts:
+        v = normalize_subject_term(p)
+        if not v:
+            continue
+        key = v.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(v)
+    return ", ".join(out)
+
+
 def build_shopify_tags(
     subjects: str,
     matched_terms: str,
@@ -86,7 +122,10 @@ def build_shopify_tags(
     if subjects:
         raw.extend([x.strip() for x in _TAG_SPLIT.split(subjects) if x.strip()])
     if matched_terms:
-        raw.extend([x.strip() for x in matched_terms.split(",") if x.strip()])
+        for term in (x.strip() for x in matched_terms.split(",") if x.strip()):
+            if term.lower().startswith("contains:"):
+                continue
+            raw.append(term)
     if publisher:
         raw.append(publisher.strip())
 

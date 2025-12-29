@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from isbn_harvester.core.models import BookRow
+from isbn_harvester.io.export_full import write_full_csv
 
 HTML_RE = re.compile(r"<[^>]+>")
 NON_WORD_RE = re.compile(r"[^0-9a-zA-Z\s]+")
@@ -19,7 +21,10 @@ FIELD_WEIGHTS = {
     "overview": 1.5,
     "synopsis": 1.5,
     "excerpt": 1.0,
+    "description": 1.5,
     "subjects": 2.0,
+    "ol_subjects": 1.1,
+    "loc_subjects": 1.3,
     "publisher": 0.5,
 }
 
@@ -39,11 +44,14 @@ AXIS_MAX = {
 }
 
 AXIS_TAG_PREFIX = {
+    "content_type": "Type",
     "primary_genre": "Genre",
     "jewish_themes": "Theme",
     "geography": "Place",
     "historical_era": "Era",
     "religious_orientation": "Orientation",
+    "cultural_tradition": "Tradition",
+    "language": "Language",
     "character_focus": "Character",
     "narrative_style": "Narrative",
     "emotional_tone": "Tone",
@@ -53,6 +61,7 @@ AXIS_TAG_PREFIX = {
 DEFAULT_MULTI_THRESHOLD = 4.0
 DEFAULT_MULTI_MAX = 4
 PRIMARY_FALLBACK_THRESHOLD = 4.5
+SINGLE_AXES = {"primary_genre", "content_type"}
 
 
 def _clean_text(text: str) -> str:
@@ -66,6 +75,20 @@ def _clean_text(text: str) -> str:
     return t
 
 
+def _parse_json_list(value: str) -> List[str]:
+    raw = (value or "").strip()
+    if not raw:
+        return []
+    if raw.startswith("["):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [str(v) for v in parsed if str(v).strip()]
+        except Exception:
+            return []
+    return [raw]
+
+
 def _jsonl_write(path: Optional[str], obj: dict) -> None:
     if not path:
         return
@@ -74,9 +97,11 @@ def _jsonl_write(path: Optional[str], obj: dict) -> None:
         f.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
 
-def _load_taxonomy(path: str) -> Dict[str, List[dict]]:
+def _load_taxonomy(path: str) -> Tuple[dict, Dict[str, List[dict]]]:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
-    return {k: list(v) for k, v in data.items() if isinstance(v, list)}
+    meta = data.get("meta") if isinstance(data, dict) else {}
+    taxonomy = {k: list(v) for k, v in data.items() if k != "meta" and isinstance(v, list)}
+    return meta or {}, taxonomy
 
 
 def _get_list(node: dict, key: str) -> List[str]:
@@ -94,10 +119,27 @@ def _extract_signals(signals: dict) -> Tuple[List[str], List[str], List[str]]:
 
 
 def _default_fields() -> List[str]:
-    return ["title", "subtitle", "title_long", "overview", "synopsis", "excerpt", "subjects", "publisher"]
+    return [
+        "title",
+        "subtitle",
+        "title_long",
+        "overview",
+        "synopsis",
+        "description",
+        "excerpt",
+        "subjects",
+        "ol_subjects",
+        "loc_subjects",
+        "publisher",
+    ]
 
 
-def _field_weight(field: str) -> float:
+def _field_weight(field: str, field_weights: Optional[dict]) -> float:
+    if field_weights and field in field_weights:
+        try:
+            return float(field_weights.get(field, 1.0))
+        except Exception:
+            return float(FIELD_WEIGHTS.get(field, 1.0))
     return float(FIELD_WEIGHTS.get(field, 1.0))
 
 
@@ -107,10 +149,11 @@ def _match_keyword(term: str, text: str) -> bool:
     return re.search(rf"\b{re.escape(term)}\b", text) is not None
 
 
-def _score_node(node: dict, doc: dict) -> Tuple[float, List[dict]]:
+def _score_node(node: dict, doc: dict, field_weights: Optional[dict]) -> Tuple[float, List[dict]]:
     signals = node.get("signals") or {}
     neg = node.get("negative_signals") or {}
     weight = float(node.get("weight") or 1.0)
+    calibration = node.get("calibration") or {}
     fields = node.get("applies_to_fields") or _default_fields()
     if not isinstance(fields, list) or not fields:
         fields = _default_fields()
@@ -127,7 +170,7 @@ def _score_node(node: dict, doc: dict) -> Tuple[float, List[dict]]:
         text = doc.get(field, "")
         if not text:
             continue
-        fweight = _field_weight(field)
+        fweight = _field_weight(field, field_weights)
 
         for phrase in phrases:
             phrase_norm = _clean_text(phrase)
@@ -175,18 +218,34 @@ def _score_node(node: dict, doc: dict) -> Tuple[float, List[dict]]:
             except re.error:
                 continue
 
-    return total * weight, matches
+    total = total * weight
+    min_score = calibration.get("min_score")
+    if min_score is not None:
+        try:
+            if float(total) < float(min_score):
+                return 0.0, []
+        except Exception:
+            pass
+    return total, matches
 
 
 def _build_doc(row: BookRow) -> dict:
+    description = f"{row.synopsis} {row.overview}".strip()
+    google_cats = _parse_json_list(row.google_categories)
+    subjects_combined = ", ".join(
+        [s for s in [row.subjects, row.google_main_category, ", ".join(google_cats)] if s]
+    )
     return {
         "title": _clean_text(row.title),
         "subtitle": _clean_text(row.subtitle),
         "title_long": _clean_text(row.title_long),
         "overview": _clean_text(row.overview),
         "synopsis": _clean_text(row.synopsis),
+        "description": _clean_text(description),
         "excerpt": "",
-        "subjects": _clean_text(row.subjects),
+        "subjects": _clean_text(subjects_combined),
+        "ol_subjects": _clean_text(row.ol_subjects),
+        "loc_subjects": _clean_text(row.loc_subjects),
         "publisher": _clean_text(row.publisher),
     }
 
@@ -194,6 +253,7 @@ def _build_doc(row: BookRow) -> dict:
 def assign_taxonomy(
     row: BookRow,
     taxonomy: Dict[str, List[dict]],
+    meta: dict,
     *,
     review_queue_path: Optional[str] = None,
     debug_path: Optional[str] = None,
@@ -201,11 +261,15 @@ def assign_taxonomy(
     doc = _build_doc(row)
     assignments: Dict[str, List[dict]] = {}
     reasons: List[str] = []
+    defaults = (meta or {}).get("defaults") or {}
+    field_weights = defaults.get("field_weights") or {}
+    thresholds = defaults.get("thresholds") or {}
+    caps = defaults.get("caps") or {}
 
     for axis, nodes in taxonomy.items():
         scored = []
         for node in nodes:
-            score, matches = _score_node(node, doc)
+            score, matches = _score_node(node, doc, field_weights)
             if score <= 0:
                 continue
             scored.append(
@@ -223,11 +287,11 @@ def assign_taxonomy(
 
     chosen_by_axis: Dict[str, List[dict]] = {}
     for axis, scored in assignments.items():
-        threshold = AXIS_THRESHOLDS.get(axis, DEFAULT_MULTI_THRESHOLD)
-        if axis == "primary_genre":
+        threshold = thresholds.get(axis, AXIS_THRESHOLDS.get(axis, DEFAULT_MULTI_THRESHOLD))
+        if axis in SINGLE_AXES:
             chosen = [scored[0]] if scored and scored[0]["score"] >= threshold else []
         else:
-            max_n = AXIS_MAX.get(axis, DEFAULT_MULTI_MAX)
+            max_n = caps.get(axis, AXIS_MAX.get(axis, DEFAULT_MULTI_MAX))
             chosen = [s for s in scored if s["score"] >= threshold][:max_n]
         chosen_by_axis[axis] = chosen
 
@@ -261,6 +325,8 @@ def assign_taxonomy(
 
     if not assigned_ids.get("primary_genre"):
         reasons.append("no_primary_genre")
+    if "content_type" in assignments and not assigned_ids.get("content_type"):
+        reasons.append("no_content_type")
     if len(assigned_ids.get("jewish_themes", [])) == 0:
         reasons.append("no_jewish_themes")
     if themes_match_count > AXIS_MAX.get("jewish_themes", 6):
@@ -318,11 +384,14 @@ def assign_taxonomy(
 
     return replace(
         row,
+        taxonomy_content_type=(assigned_ids.get("content_type") or [""])[0],
         taxonomy_primary_genre=(assigned_ids.get("primary_genre") or [""])[0],
         taxonomy_jewish_themes=json.dumps(assigned_ids.get("jewish_themes", []), ensure_ascii=False),
         taxonomy_geography=json.dumps(assigned_ids.get("geography", []), ensure_ascii=False),
         taxonomy_historical_era=json.dumps(assigned_ids.get("historical_era", []), ensure_ascii=False),
         taxonomy_religious_orientation=json.dumps(assigned_ids.get("religious_orientation", []), ensure_ascii=False),
+        taxonomy_cultural_tradition=json.dumps(assigned_ids.get("cultural_tradition", []), ensure_ascii=False),
+        taxonomy_language=json.dumps(assigned_ids.get("language", []), ensure_ascii=False),
         taxonomy_character_focus=json.dumps(assigned_ids.get("character_focus", []), ensure_ascii=False),
         taxonomy_narrative_style=json.dumps(assigned_ids.get("narrative_style", []), ensure_ascii=False),
         taxonomy_emotional_tone=json.dumps(assigned_ids.get("emotional_tone", []), ensure_ascii=False),
@@ -338,9 +407,23 @@ def apply_taxonomy(
     *,
     review_queue_path: Optional[str] = None,
     debug_path: Optional[str] = None,
+    snapshot_every_s: int = 0,
+    snapshot_dir: Optional[str] = None,
 ) -> List[BookRow]:
-    taxonomy = _load_taxonomy(taxonomy_path)
-    return [
-        assign_taxonomy(row, taxonomy, review_queue_path=review_queue_path, debug_path=debug_path)
-        for row in rows
-    ]
+    meta, taxonomy = _load_taxonomy(taxonomy_path)
+    out: List[BookRow] = []
+    last_snap = time.time()
+    if snapshot_dir:
+        Path(snapshot_dir).mkdir(parents=True, exist_ok=True)
+    for row in rows:
+        out.append(
+            assign_taxonomy(row, taxonomy, meta, review_queue_path=review_queue_path, debug_path=debug_path)
+        )
+        if snapshot_every_s and snapshot_every_s > 0 and snapshot_dir:
+            now = time.time()
+            if now - last_snap >= snapshot_every_s:
+                ts = time.strftime("%Y%m%d_%H%M%S", time.gmtime(now))
+                snap_path = str(Path(snapshot_dir) / f"taxonomy_snapshot_{ts}.csv")
+                write_full_csv(out, snap_path)
+                last_snap = now
+    return out
